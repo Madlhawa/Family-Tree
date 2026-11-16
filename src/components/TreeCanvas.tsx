@@ -238,6 +238,10 @@ export function TreeCanvas() {
                 {u.children.length > 0 && (
                   <>
                     <path
+                      className="halo"
+                      d={`M${u.junction.x},${u.junction.y + (u.partners.length === 2 ? 6 : 0)} V${u.barY} M${Math.min(u.junction.x, ...u.children.map((c) => c.x))},${u.barY} H${Math.max(u.junction.x, ...u.children.map((c) => c.x))} ${u.children.map((c) => `M${c.x},${u.barY} V${c.y - CARD_H / 2}`).join(' ')}`}
+                    />
+                    <path
                       className="descent"
                       d={`M${u.junction.x},${u.junction.y + (u.partners.length === 2 ? 6 : 0)} V${u.barY} M${Math.min(u.junction.x, ...u.children.map((c) => c.x))},${u.barY} H${Math.max(u.junction.x, ...u.children.map((c) => c.x))}`}
                     />

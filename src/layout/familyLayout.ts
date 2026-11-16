@@ -302,26 +302,46 @@ export function computeLayout(d: Dynasty, opts: LayoutOptions): Layout {
   const occupancy = new Map<number, [number, number][]>();
   const pos = new Map<number, number>();
 
-  const collides = (sub: Sub, s: number) => {
+  /**
+   * Keep-out zone for an attached parent block: it must not sit directly above
+   * other families' children, or its line down would run along theirs.
+   */
+  interface Avoid {
+    l: number;
+    r: number;
+    xs: number[];
+  }
+  const DROP_CLEAR = 30;
+
+  const collides = (sub: Sub, s: number, avoid?: Avoid) => {
     for (const [g, [l, r]] of sub.contour) {
       const row = occupancy.get(g);
       if (!row) continue;
       for (const [a, b] of row) if (l + s < b + SUBTREE_GAP && r + s > a - SUBTREE_GAP) return true;
     }
+    if (avoid) for (const x of avoid.xs) if (x > avoid.l + s - DROP_CLEAR && x < avoid.r + s + DROP_CLEAR) return true;
     return false;
   };
 
-  const place = (sub: Sub, desired: number) => {
+  const place = (sub: Sub, desired: number, avoid?: Avoid) => {
     let s = desired;
-    if (collides(sub, s)) {
+    if (collides(sub, s, avoid)) {
       const cands: number[] = [];
       for (const [g, [l, r]] of sub.contour) {
         for (const [a, b] of occupancy.get(g) ?? []) {
           cands.push(b + SUBTREE_GAP - l, a - SUBTREE_GAP - r);
         }
       }
+      if (avoid) for (const x of avoid.xs) cands.push(x + DROP_CLEAR - avoid.l + 1, x - DROP_CLEAR - avoid.r - 1);
+      // Combinations: clear a child drop, then clear the row it lands in
+      const base = [...cands];
+      for (const c of base)
+        for (const [g, [l, r]] of sub.contour)
+          for (const [a, b] of occupancy.get(g) ?? []) {
+            if (l + c < b + SUBTREE_GAP && r + c > a - SUBTREE_GAP) cands.push(b + SUBTREE_GAP - l, a - SUBTREE_GAP - r);
+          }
       cands.sort((p, q) => Math.abs(p - desired) - Math.abs(q - desired));
-      s = cands.find((c) => !collides(sub, c)) ?? desired;
+      s = cands.find((c) => !collides(sub, c, avoid)) ?? cands.find((c) => !collides(sub, c)) ?? desired;
     }
     for (const [bid, bx] of sub.x) pos.set(bid, bx + s);
     for (const [g, [l, r]] of sub.contour) {
@@ -376,7 +396,23 @@ export function computeLayout(d: Dynasty, opts: LayoutOptions): Layout {
       if (childInAnchor) target += next.anchor.offsets.get(childInAnchor) ?? 0;
     }
     const rel = sub.x.get(next.u.id) ?? 0;
-    place(sub, target - rel);
+    let avoid: Avoid | undefined;
+    if (isParent) {
+      // x of already-placed children (in the row below) who belong to other families
+      const own = new Set(next.u.unions.flatMap((uid) => d.unions[uid].children.map((c) => c.id)));
+      const xs: number[] = [];
+      for (const [bid, cx] of pos) {
+        const b = blocks[bid];
+        if (b.gen !== next.u.gen + 1) continue;
+        for (const m of b.members) {
+          if (own.has(m)) continue;
+          if (parentBlocksOf(b).some((pb) => pos.has(pb.id) && pb.unions.some((uid) => d.unions[uid].children.some((c) => c.id === m))))
+            xs.push(cx + (b.offsets.get(m) ?? 0));
+        }
+      }
+      avoid = { l: rel - next.u.width / 2, r: rel + next.u.width / 2, xs };
+    }
+    place(sub, target - rel, avoid);
     for (const k of pos.keys()) if (!before.has(k)) frontier.push(k);
   }
 
@@ -405,7 +441,7 @@ export function computeLayout(d: Dynasty, opts: LayoutOptions): Layout {
   for (const b of blocks) {
     const cx = pos.get(b.id);
     if (cx === undefined) continue;
-    b.unions.forEach((uid, ui) => {
+    b.unions.forEach((uid) => {
       const u = d.unions[uid];
       const partners = u.partners.filter((p) => nodes.has(p)).map((p) => ({ id: p, x: nodes.get(p)!.x, y: nodes.get(p)!.y }));
       const children = u.children
@@ -420,13 +456,56 @@ export function computeLayout(d: Dynasty, opts: LayoutOptions): Layout {
           : partners.length === 1
             ? { x: partners[0].x, y: y + CARD_H / 2 }
             : { x: cx, y: y + CARD_H / 2 };
-      const barY = y + CARD_H / 2 + (ROW_H - CARD_H) / 2 + (ui % 3) * 8 - 8;
-      lines.push({ id: uid, status: u.status, partners, junction, barY, children });
+      lines.push({ id: uid, status: u.status, partners, junction, barY: 0, children, gen: b.gen } as UnionLine & { gen: number });
     });
   }
+  assignBarLanes(lines as (UnionLine & { gen: number })[], rowY);
 
   if (!nodes.size) return empty;
   return { nodes, unions: lines, hiddenUp, hiddenDown, bounds: { minX, minY, maxX, maxY }, rowY };
+}
+
+export const LANE_GAP = 14;
+
+/**
+ * Give each family's horizontal sibling bar its own "lane" in the gap between
+ * two rows whenever bars would otherwise share the same line. Without this an
+ * in-law's parents, placed beside the main couple, draw their bar on top of
+ * the main family's bar and the child looks like it belongs to the wrong couple.
+ */
+export function assignBarLanes(lines: (UnionLine & { gen: number })[], rowY: (g: number) => number) {
+  const byGen = new Map<number, (UnionLine & { gen: number })[]>();
+  for (const l of lines) {
+    if (!l.children.length) {
+      l.barY = rowY(l.gen) + CARD_H / 2 + (ROW_H - CARD_H) / 2;
+      continue;
+    }
+    const a = byGen.get(l.gen);
+    if (a) a.push(l);
+    else byGen.set(l.gen, [l]);
+  }
+  for (const [gen, ls] of byGen) {
+    const span = (l: UnionLine) => {
+      const xs = [l.junction.x, ...l.children.map((c) => c.x)];
+      return [Math.min(...xs), Math.max(...xs)] as const;
+    };
+    const items = ls.map((l) => ({ l, s: span(l) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1]);
+    const laneEnds: number[] = [];
+    const lane = new Map<UnionLine, number>();
+    for (const it of items) {
+      let k = laneEnds.findIndex((end) => end + 24 < it.s[0]);
+      if (k < 0) {
+        k = laneEnds.length;
+        laneEnds.push(it.s[1]);
+      } else laneEnds[k] = it.s[1];
+      lane.set(it.l, k);
+    }
+    const n = laneEnds.length;
+    const maxSpread = ROW_H - CARD_H - 30;
+    const step = n > 1 ? Math.min(LANE_GAP, maxSpread / (n - 1)) : 0;
+    const mid = rowY(gen) + CARD_H / 2 + (ROW_H - CARD_H) / 2;
+    for (const it of items) it.l.barY = mid + (lane.get(it.l)! - (n - 1) / 2) * step;
+  }
 }
 
 function partnerMid(b: Block, partners: string[]): number {

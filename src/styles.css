@@ -2658,3 +2658,14 @@ a.chip:hover {
   max-height: calc(100vh - 32px);
   overflow-y: auto;
 }
+
+/* A background-coloured halo under each family's lines: where two families' lines
+   cross, the later one cuts a small gap, so a crossing never reads as a join. */
+.union .halo {
+  stroke: var(--bg);
+  stroke-width: 9;
+  stroke-linecap: butt;
+}
+.lod-far .union .halo {
+  stroke-width: 14;
+}

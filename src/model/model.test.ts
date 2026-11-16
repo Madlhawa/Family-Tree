@@ -188,6 +188,20 @@ describe('layout', () => {
     expect(L.nodes.has('susan')).toBe(false);
     expect(L.nodes.has('aldric')).toBe(true);
   });
+  it("in-law parents never sit directly above another family's children", () => {
+    let d = sampleDynasty();
+    let nevil = '';
+    d = produce(d, (dr) => {
+      nevil = addRelative(dr, 'priya', 'father', { given: 'Ravi', surname: 'Nair', sex: 'M' });
+    });
+    const L = computeLayout(d, { rootId: 'david', mode: 'family', collapsedDown: new Set(), collapsedUp: new Set() });
+    const n = L.nodes.get(nevil)!;
+    expect(n.y).toBe(L.nodes.get('george')!.y);
+    for (const kid of ['david', 'susan']) expect(Math.abs(L.nodes.get(kid)!.x - n.x)).toBeGreaterThan(CARD_W / 2);
+    // the two families' sibling bars use different lanes
+    const bars = L.unions.filter((u) => u.children.length && u.junction.y === n.y).map((u) => u.barY);
+    expect(new Set(bars).size).toBe(bars.length);
+  });
   it('collapse hides descendants', () => {
     const d = sampleDynasty();
     const L = computeLayout(d, { rootId: 'aldric', mode: 'family', collapsedDown: new Set(['edmund']), collapsedUp: new Set() });
