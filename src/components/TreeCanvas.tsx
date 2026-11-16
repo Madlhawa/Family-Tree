@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { camera, openDossier, select, toggleSet, useData, useUI } from '../store/store';
+import { actions, camera, openDossier, toast, toggleSet, useData, useUI } from '../store/store';
+import { pickFile, resizeImage } from '../ui/files';
 import { CARD_H, CARD_W, computeLayout, type Layout } from '../layout/familyLayout';
 import { aliveIn, birthYear, houseColor, houseOf, parentsOf } from '../model/graph';
 import { resolveArms, type ResolvedArms } from '../model/arms';
@@ -32,7 +33,10 @@ export function TreeCanvas() {
   const privacy = useUI((s) => s.privacy);
   const highlightHouse = useUI((s) => s.highlightHouse);
   const sagaActive = useUI((s) => !!s.saga);
-  const dossierId = useUI((s) => s.dossierId);
+  const crests = useUI((s) => s.crests);
+  const quickAddOpen = useUI((s) => !!s.quickAdd);
+  const [hoverId, setHoverId] = useState<string>();
+  const hideTimer = useRef<number>();
 
   const rootId = focusId && d.people[focusId] ? focusId : d.rootId;
   const layoutMode = mode === 'fan' ? 'family' : mode;
@@ -104,23 +108,6 @@ export function TreeCanvas() {
     }
   }, [rootId, layout, pz]);
 
-  // Keep the person whose dossier is open clear of the drawer
-  useEffect(() => {
-    if (!dossierId) return;
-    const n = layoutRef.current.nodes.get(dossierId);
-    const el = container.current;
-    if (!n || !el) return;
-    const c = pz.cam.current;
-    const sx = n.x * c.k + c.x;
-    const drawer = Math.min(440, el.clientWidth);
-    if (el.clientWidth - drawer < 320) return;
-    const visibleCentre = (el.clientWidth - drawer) / 2;
-    if (sx > el.clientWidth - drawer - CARD_W * c.k * 0.6 || sx < CARD_W * c.k * 0.6) {
-      const sy = n.y * c.k + c.y;
-      pz.flyTo(n.x + (el.clientWidth / 2 - visibleCentre) / c.k, n.y + (el.clientHeight / 2 - Math.min(Math.max(sy, 120), el.clientHeight - 120)) / c.k, c.k, 500);
-    }
-  }, [dossierId, pz]);
-
   // Derived visual state
   const arms = useMemo(() => {
     const m = new Map<string, ResolvedArms>();
@@ -179,16 +166,33 @@ export function TreeCanvas() {
       else if (id !== thread.a) useUI.setState({ thread: { a: thread.a, b: id } });
       return;
     }
-    const p = d.people[id];
-    if (p?.placeholder && selectedId === id) {
-      openDossier(id);
-      return;
-    }
-    select(id, false);
+    openDossier(id);
   };
-  const onDouble = (e: React.MouseEvent) => {
-    const t = (e.target as HTMLElement).closest('[data-person]') as HTMLElement | null;
-    if (t) openDossier(t.dataset.person!);
+
+  // Hovering a tile reveals the add-relative ring; it lingers briefly so the pointer can reach it
+  const onPointerOver = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    const el = e.target as HTMLElement;
+    const card = el.closest('[data-person]') as HTMLElement | null;
+    if (card || el.closest('.quick-ring')) window.clearTimeout(hideTimer.current);
+    if (card && card.dataset.person !== hoverId) setHoverId(card.dataset.person);
+  };
+  const onPointerOut = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
+    const to = e.relatedTarget as HTMLElement | null;
+    if (to && (to.closest?.('[data-person]') || to.closest?.('.quick-ring'))) return;
+    window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => setHoverId(undefined), 350);
+  };
+
+  const setPhoto = async (id: string) => {
+    const file = await pickFile('image/*');
+    if (!file) return;
+    try {
+      actions.updatePerson(id, { portrait: await resizeImage(file, 600) }, `Added a photo of ${d.people[id]?.given || 'someone'}`);
+    } catch {
+      toast('That file could not be read as an image.');
+    }
   };
 
   const quick = (rel: RelKind, anchorId: string) => (e: React.MouseEvent) => {
@@ -201,11 +205,12 @@ export function TreeCanvas() {
     (n) => n.x + CARD_W / 2 > view.x0 && n.x - CARD_W / 2 < view.x1 && n.y + CARD_H > view.y0 && n.y - CARD_H < view.y1,
   );
 
-  const sel = selectedId ? layout.nodes.get(selectedId) : undefined;
+  const ringId = quickAddOpen ? useUI.getState().quickAdd?.anchorId : hoverId ?? selectedId;
+  const sel = ringId ? layout.nodes.get(ringId) : undefined;
   const dimAll = pathIds.size > 0 || !!highlightHouse;
 
   return (
-    <div className={`canvas lod-${lod} ${picking ? 'picking' : ''}`} ref={container} onClick={onClick} onDoubleClick={onDouble}>
+    <div className={`canvas lod-${lod} ${picking ? 'picking' : ''}`} ref={container} onClick={onClick} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
       <div className="world" ref={world}>
         <svg className="lines" width={1} height={1}>
           <defs>
@@ -293,6 +298,7 @@ export function TreeCanvas() {
               time={timeOf(n.id)}
               isRoot={n.id === rootId}
               pickHint={picking}
+              crest={crests}
             />
           );
         })}
@@ -317,7 +323,16 @@ export function TreeCanvas() {
         })}
 
         {sel && lod !== 'far' && !picking && !sagaActive && (
-          <QuickRing x={sel.x} y={sel.y} id={sel.id} quick={quick} collapsedUp={collapsedUp.has(sel.id)} collapsedDown={collapsedDown.has(sel.id)} />
+          <QuickRing
+            x={sel.x}
+            y={sel.y}
+            id={sel.id}
+            quick={quick}
+            onPhoto={() => setPhoto(sel.id)}
+            hasPhoto={!!d.people[sel.id]?.portrait}
+            collapsedUp={collapsedUp.has(sel.id)}
+            collapsedDown={collapsedDown.has(sel.id)}
+          />
         )}
       </div>
 
@@ -342,9 +357,13 @@ function QuickRing({
   y,
   id,
   quick,
+  onPhoto,
+  hasPhoto,
   collapsedUp,
   collapsedDown,
 }: {
+  onPhoto: () => void;
+  hasPhoto: boolean;
   x: number;
   y: number;
   id: string;
@@ -368,8 +387,11 @@ function QuickRing({
       {btn('spouse', 'Spouse', L + CARD_W + 17, T + 4, '⚭')}
       {btn('child', 'Child', x, T + CARD_H + 26, '✦')}
       <div className="ring-actions" style={{ transform: `translate(${L + CARD_W + 10}px, ${T + CARD_H + 6}px)` }}>
-        <button data-nopan title="Open dossier (Enter)" onClick={() => openDossier(id)}>
-          📜
+        <button data-nopan title={hasPhoto ? 'Change photo' : 'Add a photo'} onClick={onPhoto}>
+          📷
+        </button>
+        <button data-nopan title="Open profile (Enter)" onClick={() => openDossier(id)}>
+          ⓘ
         </button>
         <button data-nopan title="Seat on the throne — centre the tree here (F)" onClick={() => useUI.setState({ focusId: id })}>
           ♛

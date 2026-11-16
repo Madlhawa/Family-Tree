@@ -20,16 +20,17 @@ import { resolveArms } from '../model/arms';
 import { blazon } from '../model/heraldry';
 import { allWarnings } from '../model/validate';
 import { Shield } from './Shield';
+import { Avatar, Face } from './PersonCard';
 import { ArmsEditor } from './ArmsEditor';
 import { pickFile, readAsDataURL, resizeImage } from '../ui/files';
 
 const TABS: [DossierTab, string][] = [
-  ['chronicle', 'Chronicle'],
-  ['events', 'Life'],
-  ['gallery', 'Gallery'],
-  ['heraldry', 'Arms'],
-  ['relations', 'Kin'],
+  ['chronicle', 'About'],
+  ['relations', 'Family'],
+  ['events', 'Timeline'],
+  ['gallery', 'Photos'],
   ['links', 'Links'],
+  ['heraldry', 'Crest'],
 ];
 
 export const EVENT_LABEL: Record<EventType, string> = {
@@ -76,15 +77,35 @@ function DossierInner({ p }: { p: Person }) {
   useEffect(() => setStampKey(st), [st]);
 
   const close = () => useUI.setState({ dossierId: undefined });
+  const changePhoto = async () => {
+    const file = await pickFile('image/*');
+    if (!file) return;
+    try {
+      actions.updatePerson(p.id, { portrait: await resizeImage(file, 600) }, `Added a photo of ${fullName(p)}`);
+    } catch {
+      toast('That file could not be read as an image.');
+    }
+  };
 
   return (
-    <aside className="drawer dossier" data-nopan aria-label={`Dossier of ${fullName(p)}`}>
+    <div className="dossier-backdrop" data-nopan onMouseDown={(e) => e.target === e.currentTarget && close()}>
+    <aside className="dossier" role="dialog" aria-modal="true" aria-label={`Profile of ${fullName(p)}`}>
       <header className="dossier-head">
         <button className="icon-btn close" onClick={close} aria-label="Close dossier">
           ✕
         </button>
-        <div className="dossier-portrait">
-          {p.portrait && !hidden ? <img src={p.portrait} alt={`Portrait of ${fullName(p)}`} /> : <Shield arms={arms.arms} shape={arms.shape} cadency={arms.cadency} size={84} />}
+        <div className="dossier-portrait" style={{ ['--house' as any]: houseColor(d, houseOf(p)) }}>
+          {p.portrait && !hidden ? <img src={p.portrait} alt={`Portrait of ${fullName(p)}`} /> : <Avatar sex={p.sex} size={120} />}
+          {!hidden && (
+            <button className="photo-btn" onClick={changePhoto} title={p.portrait ? 'Change photo' : 'Add a photo'}>
+              📷 {p.portrait ? 'Change' : 'Add photo'}
+            </button>
+          )}
+          {!hidden && (
+            <span className="dossier-crest" title={arms.explanation}>
+              <Shield arms={arms.arms} shape={arms.shape} cadency={arms.cadency} size={30} />
+            </span>
+          )}
         </div>
         <div className="dossier-id">
           {p.title && !hidden && <div className="d-title">{p.title}</div>}
@@ -150,6 +171,7 @@ function DossierInner({ p }: { p: Person }) {
         </button>
       </footer>
     </aside>
+    </div>
   );
 }
 
@@ -214,6 +236,7 @@ function ChronicleTab({ p }: { p: Person }) {
       ) : (
         <p className="muted empty-bio">No chronicle has been written yet. Every life has a story — add theirs.</p>
       )}
+      <AtAGlance p={p} />
       {warnings.length > 0 && (
         <div className="herald-box">
           <h4>Herald’s warnings</h4>
@@ -227,9 +250,68 @@ function ChronicleTab({ p }: { p: Person }) {
         </div>
       )}
       <button className="btn primary" onClick={() => setEditing(true)}>
-        ✒ Amend the record
+        ✒ Edit details
       </button>
     </div>
+  );
+}
+
+/** Close family and links, so the About tab answers most questions at once. */
+function AtAGlance({ p }: { p: Person }) {
+  const d = useData((s) => s.d);
+  const parents = parentsOf(d, p.id).map((r) => r.id);
+  const partners = unionsOf(d, p.id).flatMap((u) => u.partners.filter((x) => x !== p.id));
+  const kids = childrenOf(d, p.id).map((r) => r.id);
+  const sibs = siblingsOf(d, p.id).map((s) => s.id);
+  const rows: [string, string[]][] = [
+    ['Parents', parents],
+    ['Partner', partners],
+    ['Children', kids],
+    ['Siblings', sibs],
+  ];
+  const hasFamily = rows.some(([, ids]) => ids.length);
+  const links = p.links.map((l) => ({ id: l.id, label: l.label || l.url, href: safeUrl(l.url) }));
+  const socials = p.socials.map((s) => ({ id: s.id, label: `${s.platform} · @${s.handle.replace(/^@/, '')}`, href: safeUrl(PLATFORMS[s.platform]?.(s.handle.replace(/^@/, '')) ?? '') }));
+  return (
+    <>
+      {hasFamily && (
+        <section className="glance">
+          <h4>Family</h4>
+          <dl className="facts">
+            {rows
+              .filter(([, ids]) => ids.length)
+              .map(([label, ids]) => (
+                <div key={label} className="glance-row">
+                  <dt>{label}</dt>
+                  <dd>
+                    {ids.map((id) => (
+                      <PersonLink key={id} id={id} />
+                    ))}
+                  </dd>
+                </div>
+              ))}
+          </dl>
+        </section>
+      )}
+      {(links.length > 0 || socials.length > 0) && (
+        <section className="glance">
+          <h4>Links</h4>
+          <ul className="chip-list">
+            {[...links, ...socials].map((l) => (
+              <li key={l.id}>
+                {l.href ? (
+                  <a className="chip" href={l.href} target="_blank" rel="noopener noreferrer">
+                    {l.label} ↗
+                  </a>
+                ) : (
+                  <span className="chip">{l.label}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   );
 }
 
@@ -668,7 +750,7 @@ function PersonLink({ id }: { id: string }) {
   if (!q) return null;
   return (
     <button className="person-link" onClick={() => goTo(id)}>
-      <Shield arms={resolveArms(d, id).arms} shape={resolveArms(d, id).shape} size={18} />
+      <Face p={q} color={houseColor(d, houseOf(q))} size={24} />
       <span>{q.placeholder ? 'Unknown' : fullName(q)}</span>
       <span className="muted">{lifespan(q)}</span>
     </button>

@@ -178,6 +178,7 @@ interface UIState {
   privacy: boolean;
   theme: 'parchment' | 'candle';
   plain: boolean;
+  crests: boolean;
   searchOpen: boolean;
   highlightHouse?: string;
   bookOpen: boolean;
@@ -200,6 +201,7 @@ export const useUI = create<UIState>(() => ({
   privacy: loadPref('privacy', false),
   theme: loadPref('theme', prefersDark ? 'candle' : 'parchment'),
   plain: loadPref('plain', false),
+  crests: loadPref('crests', false),
   searchOpen: false,
   bookOpen: false,
   stamp: 0,
@@ -209,6 +211,7 @@ useUI.subscribe((s, prev) => {
   if (s.theme !== prev.theme) savePref('theme', s.theme);
   if (s.plain !== prev.plain) savePref('plain', s.plain);
   if (s.privacy !== prev.privacy) savePref('privacy', s.privacy);
+  if (s.crests !== prev.crests) savePref('crests', s.crests);
 });
 
 let toastTimer: number | undefined;

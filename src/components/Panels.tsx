@@ -25,8 +25,8 @@ import { proceduralArms } from '../model/heraldry';
 import { CURRENT_YEAR } from '../model/dates';
 import { Shield } from './Shield';
 import { ArmsEditor } from './ArmsEditor';
+import { Face } from './PersonCard';
 import { download, pickFile, readAsText, slug } from '../ui/files';
-import { resolveArms } from '../model/arms';
 
 const TITLES: Record<PanelId, string> = {
   houses: 'The Houses',
@@ -75,10 +75,9 @@ function PersonChip({ id }: { id: string }) {
   const d = useData((s) => s.d);
   const p = d.people[id];
   if (!p) return <span className="muted">(removed)</span>;
-  const r = resolveArms(d, id);
   return (
     <button className="person-link" onClick={() => go(id)}>
-      <Shield arms={r.arms} shape={r.shape} size={18} />
+      <Face p={p} color={houseColor(d, houseOf(p))} size={22} />
       <span>{fullName(p)}</span>
       <span className="muted">{lifespan(p)}</span>
     </button>
@@ -657,6 +656,7 @@ function Annals() {
 function Treasury() {
   const d = useData((s) => s.d);
   const plain = useUI((s) => s.plain);
+  const crests = useUI((s) => s.crests);
   const [redact, setRedact] = useState(true);
   const savedAt = useData((s) => s.savedAt);
 
@@ -736,6 +736,9 @@ function Treasury() {
         <h4>Appearance</h4>
         <label className="check">
           <input type="checkbox" checked={plain} onChange={(e) => useUI.setState({ plain: e.target.checked })} /> Clear Ledger — tone down ornament for heavy editing
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={crests} onChange={(e) => useUI.setState({ crests: e.target.checked })} /> Show coats of arms on tiles that have no photo
         </label>
       </section>
       <section>
