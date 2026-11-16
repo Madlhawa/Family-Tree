@@ -185,6 +185,15 @@ interface UIState {
   saga?: { id: string; step: number };
   toast?: { text: string; at: number };
   stamp: number;
+  newTreeOpen: boolean;
+  confirmReq?: ConfirmRequest;
+}
+
+export interface ConfirmRequest {
+  text: string;
+  okLabel: string;
+  danger: boolean;
+  resolve: (ok: boolean) => void;
 }
 
 const prefersDark = typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
@@ -205,7 +214,26 @@ export const useUI = create<UIState>(() => ({
   searchOpen: false,
   bookOpen: false,
   stamp: 0,
+  newTreeOpen: false,
 }));
+
+/** In-app replacement for window.confirm (which some browsers block). */
+export function askConfirm(text: string, okLabel = 'Confirm', danger = false): Promise<boolean> {
+  return new Promise((resolve) => {
+    useUI.getState().confirmReq?.resolve(false);
+    useUI.setState({
+      confirmReq: {
+        text,
+        okLabel,
+        danger,
+        resolve: (ok) => {
+          useUI.setState({ confirmReq: undefined });
+          resolve(ok);
+        },
+      },
+    });
+  });
+}
 
 useUI.subscribe((s, prev) => {
   if (s.theme !== prev.theme) savePref('theme', s.theme);

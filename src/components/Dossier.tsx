@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { actions, camera, openDossier, stamp, toast, useData, useUI, type DossierTab } from '../store/store';
+import { actions, askConfirm, camera, openDossier, stamp, toast, useData, useUI, type DossierTab } from '../store/store';
 import type { ChildKind, Confidence, EventType, LifeEvent, Person, Sex, UnionStatus, LivingStatus } from '../model/types';
 import { uid } from '../model/types';
 import {
@@ -164,7 +164,7 @@ function DossierInner({ p }: { p: Person }) {
         <button
           className="btn danger"
           onClick={() => {
-            if (confirm(`Strike ${fullName(p)} from the chronicle? (You can undo with Ctrl+Z.)`)) actions.deletePerson(p.id);
+            askConfirm(`Remove ${fullName(p)} from the tree? (Ctrl+Z undoes this.)`, 'Remove', true).then((ok) => ok && actions.deletePerson(p.id));
           }}
         >
           Strike out
@@ -841,7 +841,7 @@ function RelationsTab({ p }: { p: Person }) {
                   + Child
                 </button>
                 {other && (
-                  <button className="link danger" onClick={() => confirm('Dissolve this union record? Children stay with this person.') && actions.unlinkPartner(u.id, other)}>
+                  <button className="link danger" onClick={() => askConfirm('Dissolve this union record? Children stay with this person.', 'Dissolve', true).then((ok) => ok && actions.unlinkPartner(u.id, other))}>
                     Dissolve
                   </button>
                 )}

@@ -2625,3 +2625,36 @@ a.chip:hover {
     font-size: 1.35rem;
   }
 }
+
+/* In-app dialogs */
+.dialog-backdrop {
+  z-index: 95;
+  align-items: center;
+  padding: 16px;
+}
+.dialog {
+  width: min(460px, 100%);
+  background: var(--parch);
+  background-image: var(--noise);
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  padding: 20px 22px 16px;
+  box-shadow: var(--shadow-lg), inset 0 0 0 4px var(--parch), inset 0 0 0 5px var(--gold-soft);
+  animation: unroll 0.2s ease-out;
+}
+.dialog h2 {
+  font-size: 1.3rem;
+  color: var(--crimson);
+  margin-bottom: 4px;
+}
+.dialog-text {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+.new-tree .note .check {
+  margin-bottom: 0;
+}
+.dialog {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}

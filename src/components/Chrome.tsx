@@ -77,6 +77,9 @@ export function Toolbar() {
         >
           ⌛<span className="tool-label">Time</span>
         </button>
+        <button className="tool" onClick={() => useUI.setState({ newTreeOpen: true })} title="Start a new family tree">
+          ✚<span className="tool-label">New tree</span>
+        </button>
         <button className="tool" onClick={() => useUI.setState({ bookOpen: true })} title="Book of the House — a printable chronicle">
           📕<span className="tool-label">Book</span>
         </button>

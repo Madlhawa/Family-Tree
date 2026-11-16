@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { actions, camera, commit, openDossier, redo, replaceDynasty, select, stamp, toast, undo, useData, useUI, type PanelId } from '../store/store';
+import { actions, askConfirm, camera, commit, redo, replaceDynasty, select, stamp, toast, undo, useData, useUI, type PanelId } from '../store/store';
 import type { Dynasty, Person } from '../model/types';
-import { emptyDynasty, newPerson, uid } from '../model/types';
+import { uid } from '../model/types';
 import {
   birthYear,
   childrenOf,
@@ -405,7 +405,7 @@ function Sagas() {
                 </button>
               </div>
               <div className="form-actions">
-                <button className="btn danger ghost" onClick={() => confirm('Delete this saga?') && commit('Deleted a saga', (dr) => void delete dr.sagas[s.id])}>
+                <button className="btn danger ghost" onClick={() => askConfirm('Delete this saga?', 'Delete', true).then((ok) => ok && commit('Deleted a saga', (dr) => void delete dr.sagas[s.id]))}>
                   Delete saga
                 </button>
                 <button className="btn primary" onClick={() => setEditing(null)}>
@@ -484,7 +484,7 @@ function Heirlooms() {
             <button className="btn" disabled={!selectedId} onClick={() => commit('Passed on an heirloom', (dr) => void dr.heirlooms[h.id].custodians.push(selectedId!))}>
               + Pass to {selectedId ? fullName(d.people[selectedId]) : 'selected person'}
             </button>
-            <button className="link danger" onClick={() => confirm('Remove this heirloom?') && commit('Removed an heirloom', (dr) => void delete dr.heirlooms[h.id])}>
+            <button className="link danger" onClick={() => askConfirm('Remove this heirloom?', 'Remove', true).then((ok) => ok && commit('Removed an heirloom', (dr) => void delete dr.heirlooms[h.id]))}>
               Remove
             </button>
           </div>
@@ -676,7 +676,7 @@ function Treasury() {
       } else {
         next = importGedcom(text, f.name.replace(/\.[^.]+$/, ''));
       }
-      if (Object.keys(d.people).length && !confirm(`Replace the current chronicle (${Object.keys(d.people).length} people) with “${f.name}” (${Object.keys(next.people).length} people)? You can undo this.`)) return;
+      if (Object.keys(d.people).length && !(await askConfirm(`Replace the current tree (${Object.keys(d.people).length} people) with “${f.name}” (${Object.keys(next.people).length} people)? Ctrl+Z undoes this.`, 'Replace'))) return;
       replaceDynasty(next);
       setTimeout(() => camera.fit(), 100);
       toast(`Imported ${Object.keys(next.people).length} people.`);
@@ -744,28 +744,10 @@ function Treasury() {
       <section>
         <h4>Begin anew</h4>
         <div className="row-actions">
-          <button
-            className="btn ghost"
-            onClick={() => {
-              const name = prompt('Name of the new dynasty?', 'House ');
-              if (!name) return;
-              const given = prompt('And the first soul to record — your own given name, perhaps?', '') ?? '';
-              const surname = name.replace(/^House\s+/i, '').trim();
-              const fresh = emptyDynasty(name);
-              const p = newPerson({ given, surname, sex: 'U' });
-              fresh.people[p.id] = p;
-              fresh.rootId = p.id;
-              fresh.annals.push({ id: uid('a'), at: Date.now(), text: `The chronicle of ${name} was opened.` });
-              replaceDynasty(fresh);
-              setTimeout(() => {
-                openDossier(p.id);
-                camera.flyTo(p.id, 1);
-              }, 100);
-            }}
-          >
-            ✦ Start a new dynasty
+          <button className="btn primary" onClick={() => useUI.setState({ newTreeOpen: true })}>
+            ✦ Start a new family tree
           </button>
-          <button className="btn ghost" onClick={() => confirm('Load the House Ashcombe demonstration? Your current chronicle can be restored with Undo.') && replaceDynasty(sampleDynasty())}>
+          <button className="btn ghost" onClick={() => askConfirm('Replace the current tree with the House Ashcombe demo? Ctrl+Z undoes this.', 'Load demo').then((ok) => ok && replaceDynasty(sampleDynasty()))}>
             Load the demo dynasty
           </button>
         </div>

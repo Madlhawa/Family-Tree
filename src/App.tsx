@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { actions, camera, initData, openDossier, redo, select, toggleSet, undo, useData, useUI } from './store/store';
+import { actions, askConfirm, camera, initData, openDossier, redo, select, toggleSet, undo, useData, useUI } from './store/store';
 import { TreeCanvas } from './components/TreeCanvas';
 import { FanChart } from './components/FanChart';
 import { Dossier } from './components/Dossier';
 import { QuickAdd } from './components/QuickAdd';
 import { Panel } from './components/Panels';
 import { Book } from './components/Book';
+import { ConfirmDialog, NewTreeDialog } from './components/Dialogs';
 import { SagaPlayer, SealStamp, SearchPalette, ThreadBanner, TimeScrubber, Toast, Toolbar } from './components/Chrome';
 import { childrenOf, fullName, parentsOf } from './model/graph';
 import { parseDate } from './model/dates';
@@ -56,6 +57,7 @@ function useKeyboard() {
         useUI.setState({ searchOpen: true });
         return;
       }
+      if (ui.confirmReq || ui.newTreeOpen) return;
       if (e.key === 'Escape') {
         if (ui.quickAdd) return useUI.setState({ quickAdd: undefined });
         if (ui.searchOpen) return useUI.setState({ searchOpen: false });
@@ -94,8 +96,8 @@ function useKeyboard() {
       }
       if (k === 'Enter') return openDossier(id);
       if (k === 'f') return useUI.setState({ focusId: id });
-      if (k === 'Delete' && confirm(`Strike ${fullName(d.people[id])} from the chronicle?`)) {
-        actions.deletePerson(id);
+      if (k === 'Delete') {
+        askConfirm(`Remove ${fullName(d.people[id])} from the tree? (Ctrl+Z undoes this.)`, 'Remove', true).then((ok) => ok && actions.deletePerson(id));
         return;
       }
       if (k === '[') return toggleSet('collapsedUp', id);
@@ -197,6 +199,8 @@ export function App() {
       <Toast />
       <SealStamp />
       {bookOpen && <Book />}
+      <NewTreeDialog />
+      <ConfirmDialog />
     </div>
   );
 }
