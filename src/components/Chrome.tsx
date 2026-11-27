@@ -15,30 +15,147 @@ const MODES: [Mode, string, string][] = [
   ['fan', 'Fan chart', 'Radial pedigree'],
 ];
 
-const PANELS: [PanelId, string, string][] = [
-  ['houses', '⚜', 'Families'],
-  ['records', '📊', 'Hall of Records'],
-  ['warnings', '⚠', 'Herald’s Warnings'],
-  ['sagas', '📖', 'Sagas'],
-  ['heirlooms', '💍', 'Heirlooms'],
-  ['dictation', '✒', 'Scribe’s Dictation'],
-  ['annals', '🕮', 'Annals (history)'],
-  ['treasury', '🗝', 'Treasury: import, export & settings'],
-  ['help', '?', 'Help & shortcuts'],
-];
+interface MenuItem {
+  icon: string;
+  label: string;
+  hint?: string;
+  on?: boolean;
+  disabled?: boolean;
+  run: () => void;
+}
+
+/** Everything that used to crowd the toolbar, as one dropdown. */
+function ToolMenu() {
+  const [open, setOpen] = useState(false);
+  const panel = useUI((s) => s.panel);
+  const theme = useUI((s) => s.theme);
+  const privacy = useUI((s) => s.privacy);
+  const timeYear = useUI((s) => s.timeYear);
+  const thread = useUI((s) => s.thread);
+  const past = useData((s) => s.past.length);
+  const future = useData((s) => s.future.length);
+  const wrap = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setOpen(false);
+        button.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey, true);
+    setTimeout(() => wrap.current?.querySelector<HTMLButtonElement>('.menu-item:not(:disabled)')?.focus(), 0);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+
+  const openPanel = (id: PanelId) => () => useUI.setState({ panel: panel === id ? null : id });
+  const sections: [string, MenuItem[]][] = [
+    [
+      'Explore',
+      [
+        { icon: '🔍', label: 'Search people', hint: '/', run: () => useUI.setState({ searchOpen: true }) },
+        { icon: '✧', label: 'How are they related?', hint: 'G', on: !!thread, run: () => useUI.setState({ thread: thread ? null : {} }) },
+        { icon: '⌛', label: 'Time travel', hint: 'T', on: timeYear !== null, run: () => useUI.setState({ timeYear: timeYear === null ? 1900 : null }) },
+        { icon: '📕', label: 'Printable family book', run: () => useUI.setState({ bookOpen: true }) },
+      ],
+    ],
+    [
+      'Edit',
+      [
+        { icon: '↶', label: 'Undo', hint: 'Ctrl+Z', disabled: !past, run: undo },
+        { icon: '↷', label: 'Redo', hint: 'Ctrl+Y', disabled: !future, run: redo },
+        { icon: '✒', label: 'Quick entry (type a whole family)', on: panel === 'dictation', run: openPanel('dictation') },
+        { icon: '✚', label: 'Start a new family tree', run: () => useUI.setState({ newTreeOpen: true }) },
+      ],
+    ],
+    [
+      'Panels',
+      [
+        { icon: '⚜', label: 'Families', on: panel === 'houses', run: openPanel('houses') },
+        { icon: '📊', label: 'Statistics', on: panel === 'records', run: openPanel('records') },
+        { icon: '⚠', label: 'Data checks & duplicates', on: panel === 'warnings', run: openPanel('warnings') },
+        { icon: '📖', label: 'Stories (guided tours)', on: panel === 'sagas', run: openPanel('sagas') },
+        { icon: '💍', label: 'Heirlooms', on: panel === 'heirlooms', run: openPanel('heirlooms') },
+        { icon: '🕮', label: 'Change history', on: panel === 'annals', run: openPanel('annals') },
+      ],
+    ],
+    [
+      'Settings',
+      [
+        { icon: '🗝', label: 'Settings, import & backup', on: panel === 'treasury', run: openPanel('treasury') },
+        { icon: privacy ? '🔒' : '🔓', label: 'Public view (hide living people)', on: privacy, run: () => useUI.setState({ privacy: !privacy }) },
+        { icon: '☾', label: 'Dark theme', on: theme === 'candle', run: () => useUI.setState({ theme: theme === 'candle' ? 'parchment' : 'candle' }) },
+        { icon: '?', label: 'Help & shortcuts', on: panel === 'help', run: openPanel('help') },
+      ],
+    ],
+  ];
+
+  return (
+    <div className="menu-wrap" ref={wrap}>
+      <button
+        ref={button}
+        className={`menu-button ${open ? 'on' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Menu"
+      >
+        <span className="menu-burger" aria-hidden>
+          ☰
+        </span>
+        <span className="menu-button-label">Menu</span>
+      </button>
+      {open && (
+        <div className="menu-dropdown" role="menu">
+          {sections.map(([title, items]) => (
+            <div key={title} className="menu-section" role="group" aria-label={title}>
+              <div className="menu-heading">{title}</div>
+              {items.map((it) => (
+                <button
+                  key={it.label}
+                  role="menuitem"
+                  className={`menu-item ${it.on ? 'on' : ''}`}
+                  disabled={it.disabled}
+                  onClick={() => {
+                    setOpen(false);
+                    it.run();
+                  }}
+                >
+                  <span className="menu-icon" aria-hidden>
+                    {it.icon}
+                  </span>
+                  <span className="menu-label">{it.label}</span>
+                  {it.on && (
+                    <span className="menu-check" aria-label="on">
+                      ✓
+                    </span>
+                  )}
+                  {it.hint && <kbd className="menu-hint">{it.hint}</kbd>}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Toolbar() {
   const d = useData((s) => s.d);
   const mode = useUI((s) => s.mode);
-  const panel = useUI((s) => s.panel);
-  const theme = useUI((s) => s.theme);
   const extras = useUI((s) => s.extras);
-  const privacy = useUI((s) => s.privacy);
-  const timeYear = useUI((s) => s.timeYear);
-  const thread = useUI((s) => s.thread);
   const focusId = useUI((s) => s.focusId);
-  const past = useData((s) => s.past.length);
-  const future = useData((s) => s.future.length);
   const mainHouse = d.people[d.rootId ?? '']?.surname ?? d.name.replace(/^House\s+/i, '');
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -50,13 +167,6 @@ export function Toolbar() {
   }, []);
   return (
     <header className="toolbar" data-nopan ref={ref}>
-      <div className="brand" title={d.motto}>
-        {extras ? <Shield arms={houseArms(d, mainHouse)} size={30} /> : <span className="brand-mark" aria-hidden>♛</span>}
-        <div>
-          <div className="brand-name">{d.name}</div>
-          {extras && d.motto && <div className="brand-motto">{d.motto}</div>}
-        </div>
-      </div>
       <nav className="modes" aria-label="View">
         {MODES.map(([m, label, hint]) => (
           <button key={m} className={mode === m ? 'on' : ''} onClick={() => useUI.setState({ mode: m })} title={hint}>
@@ -64,52 +174,19 @@ export function Toolbar() {
           </button>
         ))}
       </nav>
-      <div className="tools">
-        <button className="tool" onClick={() => useUI.setState({ searchOpen: true })} title="Search (/ or Ctrl+K)">
-          🔍<span className="tool-label">Search</span>
-        </button>
-        <button className={`tool ${thread ? 'on' : ''}`} onClick={() => useUI.setState({ thread: thread ? null : {} })} title="Golden Thread: how are two people related? (G)">
-          ✧<span className="tool-label">Thread</span>
-        </button>
-        <button
-          className={`tool ${timeYear !== null ? 'on' : ''}`}
-          onClick={() => useUI.setState({ timeYear: timeYear === null ? 1900 : null })}
-          title="Time scrubber: who was alive in a given year (T)"
-        >
-          ⌛<span className="tool-label">Time</span>
-        </button>
-        <button className="tool" onClick={() => useUI.setState({ newTreeOpen: true })} title="Start a new family tree">
-          ✚<span className="tool-label">New tree</span>
-        </button>
-        <button className="tool" onClick={() => useUI.setState({ bookOpen: true })} title="Book of the House — a printable chronicle">
-          📕<span className="tool-label">Book</span>
-        </button>
-        <span className="sep" />
-        <button className="tool" onClick={undo} disabled={!past} title="Undo (Ctrl+Z)" aria-label="Undo">
-          ↶
-        </button>
-        <button className="tool" onClick={redo} disabled={!future} title="Redo (Ctrl+Y)" aria-label="Redo">
-          ↷
-        </button>
-        <span className="sep" />
-        {PANELS.map(([id, glyph, label]) => (
-          <button key={id} className={`tool icon ${panel === id ? 'on' : ''}`} onClick={() => useUI.setState({ panel: panel === id ? null : id })} title={label} aria-label={label}>
-            {glyph}
-          </button>
-        ))}
-        <span className="sep" />
-        <button className={`tool icon ${privacy ? 'on' : ''}`} onClick={() => useUI.setState({ privacy: !privacy })} title={privacy ? 'Public view is ON — living people are sealed' : 'Public view: seal living people for screenshots & sharing'} aria-label="Public view">
-          {privacy ? '🔒' : '🔓'}
-        </button>
-        <button className="tool icon" onClick={() => useUI.setState({ theme: theme === 'candle' ? 'parchment' : 'candle' })} title={theme === 'candle' ? 'Daylight parchment' : 'Candlelight (dark)'} aria-label="Toggle theme">
-          {theme === 'candle' ? '☀' : '☾'}
-        </button>
+      <div className="brand" title={d.motto}>
+        {extras ? <Shield arms={houseArms(d, mainHouse)} size={30} /> : <span className="brand-mark" aria-hidden>♛</span>}
+        <div>
+          <div className="brand-name">{d.name}</div>
+          {extras && d.motto && <div className="brand-motto">{d.motto}</div>}
+        </div>
       </div>
+      <ToolMenu />
       {focusId && focusId !== d.rootId && d.people[focusId] && (
         <div className="throne-chip">
-          ♛ {fullName(d.people[focusId])}
+          ⌖ Centred on {fullName(d.people[focusId])}
           <button className="link" onClick={() => useUI.setState({ focusId: undefined })}>
-            return home
+            back to home person
           </button>
         </div>
       )}
