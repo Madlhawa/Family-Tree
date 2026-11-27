@@ -2749,3 +2749,30 @@ a.chip:hover {
   background: var(--house);
   box-shadow: 0 0 0 2px var(--parch), 0 0 0 3px var(--gold-soft);
 }
+
+/* ---------------------------------------------------------------- Drag to reorder siblings */
+.card.dragging {
+  transition: none;
+  z-index: 30;
+  opacity: 0.93;
+  scale: 1.04;
+  cursor: grabbing;
+  box-shadow: 0 0 0 2px var(--gold-bright), 0 22px 40px rgba(40, 22, 6, 0.4);
+  animation: none;
+}
+.canvas.reordering,
+.canvas.reordering .card {
+  cursor: grabbing;
+}
+.drop-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  border-radius: 3px;
+  background: var(--gold-bright);
+  box-shadow: 0 0 14px rgba(230, 190, 98, 0.9);
+  pointer-events: none;
+  z-index: 25;
+  animation: fade 0.15s ease-out;
+}

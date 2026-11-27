@@ -844,6 +844,11 @@ function RelationsTab({ p }: { p: Person }) {
                 >
                   + Child
                 </button>
+                {u.manualOrder && (
+                  <button className="link" onClick={() => actions.resetChildOrder(u.id)} title="Undo the manual arrangement and order the children by birth date">
+                    ↺ Sort by birth date
+                  </button>
+                )}
                 {other && (
                   <button className="link danger" onClick={() => askConfirm('Dissolve this union record? Children stay with this person.', 'Dissolve', true).then((ok) => ok && actions.unlinkPartner(u.id, other))}>
                     Dissolve

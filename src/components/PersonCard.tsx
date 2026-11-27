@@ -25,6 +25,10 @@ interface Props {
   crest: boolean;
   /** Heraldry & dynasty extras switched on */
   extras: boolean;
+  /** Being dragged to a new position among siblings */
+  dragging?: boolean;
+  /** Has siblings, so it can be dragged sideways to reorder */
+  movable?: boolean;
 }
 
 /** A neutral silhouette tinted with the House colour, for people without a photo. */
@@ -48,7 +52,7 @@ export function Face({ p, color, size = 24 }: { p: Person; color: string; size?:
   );
 }
 
-function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, privacy, time, isRoot, pickHint, crest, extras }: Props) {
+function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, privacy, time, isRoot, pickHint, crest, extras, dragging, movable }: Props) {
   const living = isLiving(p);
   const hidden = privacy && living;
   const name = hidden ? `Living ${p.surname || 'Member'}` : fullName(p);
@@ -63,6 +67,8 @@ function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, priva
     time && `t-${time}`,
     isRoot && 'root',
     pickHint && 'pickable',
+    dragging && 'dragging',
+    movable && 'movable',
   ]
     .filter(Boolean)
     .join(' ');
@@ -73,6 +79,7 @@ function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, priva
     <div
       className={cls}
       data-person={p.id}
+      title={movable ? 'Click to open · drag sideways to reorder' : undefined}
       style={{ transform: `translate(${x - CARD_W / 2}px, ${y - CARD_H / 2}px)`, width: CARD_W, height: CARD_H, ['--house' as any]: color }}
     >
       <div className="card-far" aria-hidden>

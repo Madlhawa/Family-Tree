@@ -136,6 +136,14 @@ export const actions = {
       if (d.unions[id]) Object.assign(d.unions[id], patch);
     });
   },
+  reorderChildren(unionId: string, orderedIds: string[]) {
+    commit('Rearranged the order of siblings', (d) => ops.reorderChildren(d, unionId, orderedIds));
+  },
+  resetChildOrder(unionId: string) {
+    commit('Put siblings back in birth order', (d) => {
+      if (d.unions[unionId]) d.unions[unionId].manualOrder = undefined;
+    });
+  },
   unlinkChild(unionId: string, childId: string) {
     commit('Removed a parent–child link', (d) => ops.unlinkChild(d, unionId, childId));
   },

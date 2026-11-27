@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { actions, camera, openDossier, toast, toggleSet, useData, useUI } from '../store/store';
 import { pickFile, resizeImage } from '../ui/files';
 import { CARD_H, CARD_W, computeLayout, type Layout } from '../layout/familyLayout';
-import { aliveIn, birthYear, houseColor, houseOf, parentsOf } from '../model/graph';
+import { aliveIn, birthYear, getIndex, houseColor, houseOf, parentsOf, spousesOf } from '../model/graph';
 import { resolveArms, type ResolvedArms } from '../model/arms';
 import { allWarnings } from '../model/validate';
 import { describeRelationship } from '../model/relationship';
@@ -12,6 +12,8 @@ import type { RelKind } from '../model/ops';
 import { Minimap } from './Minimap';
 
 type Lod = 'full' | 'compact' | 'far';
+/** How far outside the end tiles the drop marker sits when dropping at either end */
+const SIB_MARK_GAP = 20;
 const lodOf = (k: number): Lod => (k < 0.22 ? 'far' : k < 0.5 ? 'compact' : 'full');
 
 interface ViewRect {
@@ -74,7 +76,129 @@ export function TreeCanvas() {
     camListeners.current.forEach((fn) => fn(c));
   }, []);
 
-  const pz = usePanZoom(container, world, onView);
+  // ---- Drag a tile sideways to reorder brothers and sisters -----------------
+  interface DragState {
+    id: string;
+    unionId: string;
+    order: string[];
+    x: number;
+    insertAt: number;
+    markerX: number;
+    markerY: number;
+  }
+  const [drag, setDrag] = useState<DragState>();
+  const justDragged = useRef(false);
+  const pzRef = useRef<ReturnType<typeof usePanZoom>>();
+
+  /** The family a person can be reordered within: their birth family as currently drawn. */
+  const siblingGroup = (id: string) => {
+    const L = layoutRef.current;
+    const dd = useData.getState().d;
+    for (const uid of getIndex(dd).birthUnions.get(id) ?? []) {
+      const line = L.unions.find((u) => u.id === uid);
+      if (line && line.children.length >= 2 && line.children.some((c) => c.id === id))
+        return { unionId: uid, order: [...line.children].sort((a, b) => a.x - b.x).map((c) => c.id) };
+    }
+    return undefined;
+  };
+
+  /** Horizontal extent of a sibling together with the partners drawn beside them. */
+  const spanOf = (id: string): [number, number] => {
+    const L = layoutRef.current;
+    const n = L.nodes.get(id)!;
+    let lo = n.x - CARD_W / 2;
+    let hi = n.x + CARD_W / 2;
+    for (const s of spousesOf(useData.getState().d, id)) {
+      const m = L.nodes.get(s.id);
+      if (m && m.y === n.y && Math.abs(m.x - n.x) < CARD_W * 1.5) {
+        lo = Math.min(lo, m.x - CARD_W / 2);
+        hi = Math.max(hi, m.x + CARD_W / 2);
+      }
+    }
+    return [lo, hi];
+  };
+
+  const toWorldX = (clientX: number) => {
+    const r = container.current!.getBoundingClientRect();
+    const c = pzRef.current!.cam.current;
+    return (clientX - r.left - c.x) / c.k;
+  };
+
+  const canStart = (e: PointerEvent): boolean => {
+    const card = (e.target as HTMLElement).closest?.('[data-person]') as HTMLElement | null;
+    const ui = useUI.getState();
+    if (!card || ui.thread || ui.saga || ui.timeYear !== null || ui.quickAdd) return true;
+    const id = card.dataset.person!;
+    const group = siblingGroup(id);
+    const node = layoutRef.current.nodes.get(id);
+    if (!group || !node) return true; // nothing to reorder: let the canvas pan
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const grabDx = node.x - toWorldX(e.clientX);
+    let started = false;
+    let state: DragState | undefined;
+
+    const compute = (clientX: number): DragState => {
+      const L = layoutRef.current;
+      const x = toWorldX(clientX) + grabDx;
+      const others = group.order.filter((o) => o !== id && L.nodes.has(o));
+      const insertAt = others.filter((o) => L.nodes.get(o)!.x < x).length;
+      let markerX: number;
+      if (!others.length) markerX = x;
+      else if (insertAt === 0) markerX = spanOf(others[0])[0] - SIB_MARK_GAP;
+      else if (insertAt === others.length) markerX = spanOf(others[others.length - 1])[1] + SIB_MARK_GAP;
+      else markerX = (spanOf(others[insertAt - 1])[1] + spanOf(others[insertAt])[0]) / 2;
+      return { id, unionId: group.unionId, order: group.order, x, insertAt, markerX, markerY: node.y };
+    };
+    const onMove = (ev: PointerEvent) => {
+      if (!started) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 6) return;
+        started = true;
+        setHoverId(undefined);
+        container.current?.classList.add('reordering');
+      }
+      state = compute(ev.clientX);
+      setDrag(state);
+    };
+    const finish = (commitIt: boolean) => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('keydown', onKey, true);
+      container.current?.classList.remove('reordering');
+      if (!started) return;
+      justDragged.current = true;
+      setTimeout(() => (justDragged.current = false), 0);
+      setDrag(undefined);
+      if (!commitIt || !state) return;
+      const others = state.order.filter((o) => o !== id);
+      const next = [...others.slice(0, state.insertAt), id, ...others.slice(state.insertAt)];
+      if (next.join() !== state.order.join()) actions.reorderChildren(state.unionId, next);
+    };
+    const onUp = () => finish(true);
+    const onCancel = () => finish(false);
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') {
+        ev.stopPropagation();
+        finish(false);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('keydown', onKey, true);
+    return false;
+  };
+
+  const pz = usePanZoom(container, world, onView, undefined, canStart);
+  pzRef.current = pz;
+
+  // Tiles that belong to a family with more than one child can be dragged to reorder
+  const movable = useMemo(
+    () => new Set(layout.unions.filter((u) => u.children.length >= 2).flatMap((u) => u.children.map((c) => c.id))),
+    [layout],
+  );
 
   // Fly to people on request
   useEffect(
@@ -155,7 +279,7 @@ export function TreeCanvas() {
 
   // Interaction
   const onClick = (e: React.MouseEvent) => {
-    if (pz.wasDragged()) return;
+    if (pz.wasDragged() || justDragged.current) return;
     const t = (e.target as HTMLElement).closest('[data-person]') as HTMLElement | null;
     if (!t) {
       if (!(e.target as HTMLElement).closest('[data-nopan]')) useUI.setState({ selectedId: undefined, quickAdd: undefined });
@@ -206,7 +330,7 @@ export function TreeCanvas() {
     (n) => n.x + CARD_W / 2 > view.x0 && n.x - CARD_W / 2 < view.x1 && n.y + CARD_H > view.y0 && n.y - CARD_H < view.y1,
   );
 
-  const ringId = quickAddOpen ? useUI.getState().quickAdd?.anchorId : hoverId ?? selectedId;
+  const ringId = drag ? undefined : quickAddOpen ? useUI.getState().quickAdd?.anchorId : hoverId ?? selectedId;
   const sel = ringId ? layout.nodes.get(ringId) : undefined;
   const dimAll = pathIds.size > 0 || !!highlightHouse;
 
@@ -291,8 +415,10 @@ export function TreeCanvas() {
             <PersonCard
               key={n.id}
               p={p}
-              x={n.x}
-              y={n.y}
+              x={drag?.id === n.id ? drag.x : n.x}
+              y={drag?.id === n.id ? n.y - 10 : n.y}
+              dragging={drag?.id === n.id}
+              movable={movable.has(n.id)}
               arms={arms.get(n.id)!}
               color={colors.get(houseOf(p)) ?? '#8b1a1a'}
               selected={selectedId === n.id}
@@ -308,6 +434,14 @@ export function TreeCanvas() {
             />
           );
         })}
+
+        {drag && (
+          <div
+            className="drop-marker"
+            style={{ transform: `translate(${drag.markerX - 3}px, ${drag.markerY - CARD_H / 2 - 12}px)`, height: CARD_H + 24 }}
+            aria-hidden
+          />
+        )}
 
         {nodes.map((n) => {
           const up = layout.hiddenUp.get(n.id);

@@ -209,7 +209,7 @@ export function computeLayout(d: Dynasty, opts: LayoutOptions): Layout {
       .map((uid) => d.unions[uid])
       .sort((u1, u2) => partnerMid(b, u1.partners) - partnerMid(b, u2.partners));
     for (const u of us) {
-      const kids = [...u.children].sort((x, y) => sortKey(birthDate(people[x.id])) - sortKey(birthDate(people[y.id])));
+      const kids = u.manualOrder ? [...u.children] : [...u.children].sort((x, y) => sortKey(birthDate(people[x.id])) - sortKey(birthDate(people[y.id])));
       for (const c of kids) {
         const cb = blockOf.get(c.id);
         if (!cb || seen.has(cb.id) || !edges.has(cb.id)) continue;

@@ -3,7 +3,7 @@ import { produce } from 'immer';
 import { parseDate } from './dates';
 import { sampleDynasty } from './sample';
 import { describeRelationship, bloodTerm } from './relationship';
-import { addRelative, deletePerson, mergePeople } from './ops';
+import { addRelative, deletePerson, mergePeople, reorderChildren } from './ops';
 import { emptyDynasty, newPerson } from './types';
 import { exportGedcom, importGedcom } from './gedcom';
 import { parseDictation } from './dictation';
@@ -201,6 +201,20 @@ describe('layout', () => {
     // the two families' sibling bars use different lanes
     const bars = L.unions.filter((u) => u.children.length && u.junction.y === n.y).map((u) => u.barY);
     expect(new Set(bars).size).toBe(bars.length);
+  });
+  it('honours a manual sibling order and can return to birth order', () => {
+    let d = sampleDynasty();
+    const uid = Object.values(d.unions).find((u) => u.children.some((c) => c.id === 'susan'))!.id;
+    const opts = { rootId: 'david', mode: 'family' as const, collapsedDown: new Set<string>(), collapsedUp: new Set<string>() };
+    let L = computeLayout(d, opts);
+    expect(L.nodes.get('david')!.x).toBeLessThan(L.nodes.get('susan')!.x);
+    d = produce(d, (dr) => reorderChildren(dr, uid, ['susan', 'david']));
+    expect(d.unions[uid].manualOrder).toBe(true);
+    L = computeLayout(d, opts);
+    expect(L.nodes.get('susan')!.x).toBeLessThan(L.nodes.get('david')!.x);
+    d = produce(d, (dr) => void (dr.unions[uid].manualOrder = undefined));
+    L = computeLayout(d, opts);
+    expect(L.nodes.get('david')!.x).toBeLessThan(L.nodes.get('susan')!.x);
   });
   it('collapse hides descendants', () => {
     const d = sampleDynasty();

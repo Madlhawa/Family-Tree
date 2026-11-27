@@ -163,6 +163,20 @@ export function mergePeople(d: Dynasty, keepId: string, dropId: string) {
   delete d.people[dropId];
 }
 
+/**
+ * Put a union's children in the given order (ids not listed keep their
+ * relative order at the end) and remember that the order was set by hand.
+ */
+export function reorderChildren(d: Dynasty, unionId: string, orderedIds: string[]) {
+  const u = d.unions[unionId];
+  if (!u) return;
+  const byId = new Map(u.children.map((c) => [c.id, c]));
+  const listed = orderedIds.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
+  const rest = u.children.filter((c) => !orderedIds.includes(c.id));
+  u.children = [...listed, ...rest];
+  u.manualOrder = true;
+}
+
 export function unlinkChild(d: Dynasty, unionId: string, childId: string) {
   const u = d.unions[unionId];
   if (!u) return;

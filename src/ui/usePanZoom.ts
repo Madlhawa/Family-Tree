@@ -20,7 +20,11 @@ export function usePanZoom(
   layer: React.RefObject<HTMLElement | SVGGElement>,
   onView: (cam: Cam) => void,
   initial: Cam = { x: 0, y: 0, k: 0.8 },
+  /** Return false to let something else (e.g. dragging a tile) handle this pointer instead of panning */
+  canStart?: (e: PointerEvent) => boolean,
 ) {
+  const canStartRef = useRef(canStart);
+  canStartRef.current = canStart;
   const cam = useRef<Cam>({ ...initial });
   const raf = useRef<number>();
   const anim = useRef<number>();
@@ -145,6 +149,7 @@ export function usePanZoom(
     const onDown = (e: PointerEvent) => {
       if ((e.target as HTMLElement).closest('[data-nopan]')) return;
       if (e.button !== 0 && e.pointerType === 'mouse') return;
+      if (pointers.size === 0 && canStartRef.current && !canStartRef.current(e)) return;
       stopAnim();
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 1) {

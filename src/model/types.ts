@@ -100,6 +100,8 @@ export interface Union {
   place?: string;
   confidence?: Confidence;
   source?: string;
+  /** Children were arranged by hand: keep `children` order instead of sorting by birth */
+  manualOrder?: boolean;
 }
 
 export interface Heirloom {
