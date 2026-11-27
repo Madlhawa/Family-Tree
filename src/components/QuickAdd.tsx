@@ -26,22 +26,31 @@ function QuickAddForm() {
   const qa = useUI((s) => s.quickAdd)!;
   const d = useData((s) => s.d);
   const anchor = d.people[qa.anchorId];
-  const rel = qa.rel;
+  // "+ Parent" starts as father if none is recorded yet, otherwise mother; the sex toggle switches it
+  const isParent = qa.rel === 'parent';
+  const initialRel: RelKind = isParent ? (fatherOf(d, anchor.id) ? 'mother' : 'father') : qa.rel;
 
   const defaultSurname = useMemo(() => {
-    if (rel === 'father' || rel === 'sibling') return anchor.birthSurname || anchor.surname;
-    if (rel === 'child') {
+    if (initialRel === 'father' || initialRel === 'sibling') return anchor.birthSurname || anchor.surname;
+    if (initialRel === 'child') {
       if (anchor.sex === 'M') return anchor.surname;
       const sp = spousesOf(d, anchor.id).map((s) => d.people[s.id]).find((p) => p?.sex === 'M');
       return sp?.surname || anchor.surname;
     }
-    if (rel === 'mother') return '';
     return '';
-  }, [anchor, d, rel]);
+  }, [anchor, d, initialRel]);
 
   const [given, setGiven] = useState('');
   const [surname, setSurname] = useState(defaultSurname);
-  const [sex, setSex] = useState<Sex>(rel === 'father' ? 'M' : rel === 'mother' ? 'F' : rel === 'spouse' ? (anchor.sex === 'M' ? 'F' : anchor.sex === 'F' ? 'M' : 'U') : 'U');
+  const [sex, setSex] = useState<Sex>(initialRel === 'father' ? 'M' : initialRel === 'mother' ? 'F' : initialRel === 'spouse' ? (anchor.sex === 'M' ? 'F' : anchor.sex === 'F' ? 'M' : 'U') : 'U');
+  const rel: RelKind = isParent ? (sex === 'M' ? 'father' : sex === 'F' ? 'mother' : 'parent') : qa.rel;
+  const chooseSex = (next: Sex) => {
+    setSex(next);
+    if (!isParent) return;
+    const family = anchor.birthSurname || anchor.surname;
+    if (next === 'M' && !surname.trim()) setSurname(family);
+    if (next !== 'M' && surname === family) setSurname('');
+  };
   const [born, setBorn] = useState('');
   const [died, setDied] = useState('');
   const [known, setKnown] = useState('');
@@ -163,7 +172,7 @@ function QuickAddForm() {
           </div>
           <div className="sex-toggle" role="radiogroup" aria-label="Sex">
             {(['M', 'F', 'U'] as Sex[]).map((s) => (
-              <button type="button" key={s} className={sex === s ? 'on' : ''} onClick={() => setSex(s)} role="radio" aria-checked={sex === s}>
+              <button type="button" key={s} className={sex === s ? 'on' : ''} onClick={() => chooseSex(s)} role="radio" aria-checked={sex === s}>
                 {s === 'M' ? '♂ Male' : s === 'F' ? '♀ Female' : '? Unknown'}
               </button>
             ))}

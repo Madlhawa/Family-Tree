@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { actions, camera, openDossier, toast, toggleSet, useData, useUI } from '../store/store';
-import { pickFile, resizeImage } from '../ui/files';
+import { actions, camera, openDossier, toggleSet, useData, useUI } from '../store/store';
 import { CARD_H, CARD_W, computeLayout, type Layout } from '../layout/familyLayout';
 import { aliveIn, birthYear, getIndex, houseColor, houseOf, parentsOf, spousesOf } from '../model/graph';
 import { resolveArms, type ResolvedArms } from '../model/arms';
@@ -310,16 +309,6 @@ export function TreeCanvas() {
     hideTimer.current = window.setTimeout(() => setHoverId(undefined), 350);
   };
 
-  const setPhoto = async (id: string) => {
-    const file = await pickFile('image/*');
-    if (!file) return;
-    try {
-      actions.updatePerson(id, { portrait: await resizeImage(file, 600) }, `Added a photo of ${d.people[id]?.given || 'someone'}`);
-    } catch {
-      toast('That file could not be read as an image.');
-    }
-  };
-
   const quick = (rel: RelKind, anchorId: string) => (e: React.MouseEvent) => {
     e.stopPropagation();
     useUI.setState({ quickAdd: { anchorId, rel, x: e.clientX, y: e.clientY } });
@@ -468,8 +457,7 @@ export function TreeCanvas() {
             y={sel.y}
             id={sel.id}
             quick={quick}
-            onPhoto={() => setPhoto(sel.id)}
-            hasPhoto={!!d.people[sel.id]?.portrait}
+            scale={Math.min(1.3, Math.max(1, 0.62 / pz.cam.current.k))}
             collapsedUp={collapsedUp.has(sel.id)}
             collapsedDown={collapsedDown.has(sel.id)}
           />
@@ -497,13 +485,12 @@ function QuickRing({
   y,
   id,
   quick,
-  onPhoto,
-  hasPhoto,
   collapsedUp,
   collapsedDown,
+  scale,
 }: {
-  onPhoto: () => void;
-  hasPhoto: boolean;
+  /** Grow the buttons a little when zoomed out so they stay easy to hit */
+  scale: number;
   x: number;
   y: number;
   id: string;
@@ -513,36 +500,45 @@ function QuickRing({
 }) {
   const L = x - CARD_W / 2;
   const T = y - CARD_H / 2;
-  const btn = (rel: RelKind, label: string, bx: number, by: number, glyph: string) => (
-    <button data-nopan className={`ring-btn ring-${rel}`} style={{ transform: `translate(${bx - 17}px, ${by - 17}px)` }} onClick={quick(rel, id)} title={`Add ${label}`} aria-label={`Add ${label}`}>
-      <span className="ring-glyph">{glyph}</span>
-      <span className="ring-label">{label}</span>
+  // Each control is centred on (bx, by), which sits on the tile's edge
+  const add = (rel: RelKind, label: string, bx: number, by: number, shape: 'pill' | 'side') => (
+    <button
+      data-nopan
+      className={`qr-add qr-${shape} qr-${rel}`}
+      style={{ left: bx, top: by, ['--qr-scale' as any]: scale }}
+      onClick={quick(rel, id)}
+      title={`Add ${label.toLowerCase()}`}
+      aria-label={`Add ${label.toLowerCase()}`}
+    >
+      <span className="qr-plus">+</span>
+      <span className="qr-label">{label}</span>
     </button>
   );
+  const fold = (which: 'up' | 'down', by: number) => {
+    const folded = which === 'up' ? collapsedUp : collapsedDown;
+    const what = which === 'up' ? 'ancestors' : 'descendants';
+    return (
+      <button
+        data-nopan
+        className={`qr-fold ${folded ? 'on' : ''}`}
+        style={{ left: L - 14, top: by, ['--qr-scale' as any]: scale }}
+        onClick={() => toggleSet(which === 'up' ? 'collapsedUp' : 'collapsedDown', id)}
+        title={folded ? `Show ${what}` : `Fold (hide) ${what}`}
+        aria-label={folded ? `Show ${what}` : `Fold ${what}`}
+      >
+        {which === 'up' ? (folded ? '▾' : '▴') : folded ? '▴' : '▾'}
+      </button>
+    );
+  };
   return (
     <div className="quick-ring">
-      {btn('father', 'Father', L + 46, T - 24, '♂')}
-      {btn('mother', 'Mother', L + CARD_W - 46, T - 24, '♀')}
-      {btn('sibling', 'Sibling', L - 22, T + 4, '↔')}
-      {btn('spouse', 'Spouse', L + CARD_W + 17, T + 4, '⚭')}
-      {btn('child', 'Child', x, T + CARD_H + 26, '✦')}
-      <div className="ring-actions" style={{ transform: `translate(${L + CARD_W + 10}px, ${T + CARD_H + 6}px)` }}>
-        <button data-nopan title={hasPhoto ? 'Change photo' : 'Add a photo'} onClick={onPhoto}>
-          📷
-        </button>
-        <button data-nopan title="Open profile (Enter)" onClick={() => openDossier(id)}>
-          ⓘ
-        </button>
-        <button data-nopan title="Seat on the throne — centre the tree here (F)" onClick={() => useUI.setState({ focusId: id })}>
-          ♛
-        </button>
-        <button data-nopan title={collapsedUp ? 'Show ancestors' : 'Fold ancestors'} onClick={() => toggleSet('collapsedUp', id)}>
-          {collapsedUp ? '⇡' : '⤒'}
-        </button>
-        <button data-nopan title={collapsedDown ? 'Show descendants' : 'Fold descendants'} onClick={() => toggleSet('collapsedDown', id)}>
-          {collapsedDown ? '⇣' : '⤓'}
-        </button>
-      </div>
+      {add('parent', 'Parent', x, T, 'pill')}
+      {/* side buttons sit level with the photo, so they never cover the name */}
+      {add('sibling', 'Sibling', L - 6, T + 62, 'side')}
+      {add('spouse', 'Spouse', L + CARD_W + 6, T + 62, 'side')}
+      {add('child', 'Child', x, T + CARD_H, 'pill')}
+      {fold('up', T - 22)}
+      {fold('down', T + CARD_H + 22)}
     </div>
   );
 }
