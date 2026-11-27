@@ -44,6 +44,7 @@ function QuickAddForm() {
   const [sex, setSex] = useState<Sex>(rel === 'father' ? 'M' : rel === 'mother' ? 'F' : rel === 'spouse' ? (anchor.sex === 'M' ? 'F' : anchor.sex === 'F' ? 'M' : 'U') : 'U');
   const [born, setBorn] = useState('');
   const [died, setDied] = useState('');
+  const [known, setKnown] = useState('');
   const unions = unionsOf(d, anchor.id);
   const [unionId, setUnionId] = useState<string>(unions[0]?.id ?? '');
   const [linkMode, setLinkMode] = useState(false);
@@ -79,6 +80,7 @@ function QuickAddForm() {
         birthSurname: rel === 'spouse' || rel === 'mother' ? surname.trim() || undefined : undefined,
         sex,
         events,
+        occupation: known.trim() || undefined,
         placeholder: isPh || undefined,
         living: died.trim() ? 'deceased' : 'auto',
       },
@@ -103,7 +105,7 @@ function QuickAddForm() {
   // Position near the click, kept on screen
   const W = 320;
   const left = Math.min(Math.max(12, qa.x - W / 2), window.innerWidth - W - 12);
-  const top = Math.min(Math.max(70, qa.y + 16), window.innerHeight - 380);
+  const top = Math.min(Math.max(70, qa.y + 16), window.innerHeight - 450);
 
   return (
     <div className="popover quick-add" style={{ left, top, width: W }} data-nopan onKeyDown={(e) => e.key === 'Escape' && close()} role="dialog" aria-label={`Add ${REL_LABEL[rel]}`}>
@@ -176,6 +178,10 @@ function QuickAddForm() {
               <input value={died} onChange={(e) => setDied(e.target.value)} placeholder="bef. 1920" />
             </label>
           </div>
+          <label className="field">
+            <span>Occupation / known for</span>
+            <input value={known} onChange={(e) => setKnown(e.target.value)} placeholder="e.g. Teacher, Tea planter, Cricketer" />
+          </label>
           <div className="popover-actions">
             <button type="button" className="btn ghost" onClick={() => submit(true)} title="Create an empty slot to fill in later">
               Add as unknown

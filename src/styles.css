@@ -2669,3 +2669,69 @@ a.chip:hover {
 .lod-far .union .halo {
   stroke-width: 14;
 }
+
+/* ---------------------------------------------------------------- Portrait tiles (photo on top) */
+.card {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+  gap: 7px;
+  padding: 14px 10px 10px;
+}
+.card::before {
+  left: -1px;
+  right: -1px;
+  top: -1px;
+  bottom: auto;
+  width: auto;
+  height: 6px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.card-frame,
+.card-frame .avatar,
+.card-portrait {
+  width: 76px;
+  height: 76px;
+}
+.card-frame {
+  flex: none;
+}
+.card-text {
+  flex: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.card-name {
+  font-size: 0.98rem;
+  line-height: 1.15;
+  max-width: 100%;
+}
+.card-dates {
+  font-size: 0.86rem;
+}
+.card-known {
+  max-width: 100%;
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-warn {
+  right: auto;
+  left: -9px;
+}
+.lod-compact .card-known {
+  display: none;
+}
+.lod-compact .card-name {
+  font-size: 1.4rem;
+}
+.lod-far .card-far {
+  font-size: 56px;
+}

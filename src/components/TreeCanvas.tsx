@@ -12,7 +12,7 @@ import type { RelKind } from '../model/ops';
 import { Minimap } from './Minimap';
 
 type Lod = 'full' | 'compact' | 'far';
-const lodOf = (k: number): Lod => (k < 0.3 ? 'far' : k < 0.58 ? 'compact' : 'full');
+const lodOf = (k: number): Lod => (k < 0.22 ? 'far' : k < 0.5 ? 'compact' : 'full');
 
 interface ViewRect {
   x0: number;

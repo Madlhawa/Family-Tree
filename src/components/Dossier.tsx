@@ -428,7 +428,7 @@ function ChronicleEdit({ p, onDone }: { p: Person; onDone: () => void }) {
           <input value={f.birthSurname} onChange={set('birthSurname')} placeholder="if different" />
         </label>
         <label className="field">
-          <span>Calling / occupation</span>
+          <span>Occupation / known for</span>
           <input value={f.occupation} onChange={set('occupation')} />
         </label>
       </div>

@@ -12,11 +12,11 @@ import type { ChildKind, Dynasty, UnionStatus } from '../model/types';
 import { birthDate, getIndex } from '../model/graph';
 import { sortKey } from '../model/dates';
 
-export const CARD_W = 220;
-export const CARD_H = 96;
+export const CARD_W = 184;
+export const CARD_H = 186;
 export const PARTNER_GAP = 34;
-export const SUBTREE_GAP = 44;
-export const ROW_H = 200;
+export const SUBTREE_GAP = 40;
+export const ROW_H = 290;
 
 export type ViewMode = 'family' | 'ancestors' | 'descendants';
 

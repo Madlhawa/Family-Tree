@@ -65,6 +65,8 @@ function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, priva
     .filter(Boolean)
     .join(' ');
   const house = houseOf(p);
+  // One short line: what they did or are remembered for
+  const knownFor = hidden || p.placeholder ? '' : p.occupation || p.epithet || '';
   return (
     <div
       className={cls}
@@ -78,18 +80,17 @@ function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, priva
         {p.portrait && !hidden ? (
           <img className="card-portrait" src={p.portrait} alt="" draggable={false} />
         ) : crest ? (
-          <Shield arms={arms.arms} shape={arms.shape} cadency={arms.cadency} size={44} className="card-shield" />
+          <Shield arms={arms.arms} shape={arms.shape} cadency={arms.cadency} size={62} className="card-shield" />
         ) : (
-          <Avatar sex={p.sex} />
+          <Avatar sex={p.sex} size={76} />
         )}
       </div>
       <div className="card-text">
-        {p.title && !hidden && <div className="card-title">{p.title}</div>}
         <div className="card-name" title={name}>
-          {p.placeholder ? <em>Unknown{p.given ? ` ${p.given}` : ''}</em> : name}
+          {p.placeholder ? <em>Unknown{p.given ? ` ${p.given}` : ''}</em> : hidden ? name : [p.title, name].filter(Boolean).join(' ')}
         </div>
-        {p.epithet && !hidden && <div className="card-epithet">{p.epithet}</div>}
         <div className="card-dates">{hidden ? 'Living' : p.placeholder ? 'Click to fill in' : lifespanShort(p)}</div>
+        {knownFor && <div className="card-known" title={knownFor}>{knownFor}</div>}
       </div>
       <div className="card-seal" title={house ? `House ${house}` : undefined}>
         {(house[0] ?? '?').toUpperCase()}
