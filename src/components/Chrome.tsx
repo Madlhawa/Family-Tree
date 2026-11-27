@@ -3,10 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { camera, openDossier, select, useData, useUI, undo, redo, type Mode, type PanelId } from '../store/store';
 import { aliveIn, birthYear, deathYear, fullName, lifespan } from '../model/graph';
 import { describeRelationship } from '../model/relationship';
-import { houseArms } from '../model/graph';
+import { houseArms, houseColor, houseOf } from '../model/graph';
+import { Face } from './PersonCard';
 import { CURRENT_YEAR } from '../model/dates';
 import { Shield } from './Shield';
-import { resolveArms } from '../model/arms';
 
 const MODES: [Mode, string, string][] = [
   ['family', 'Family', 'The whole family graph'],
@@ -16,7 +16,7 @@ const MODES: [Mode, string, string][] = [
 ];
 
 const PANELS: [PanelId, string, string][] = [
-  ['houses', '⚜', 'Houses'],
+  ['houses', '⚜', 'Families'],
   ['records', '📊', 'Hall of Records'],
   ['warnings', '⚠', 'Herald’s Warnings'],
   ['sagas', '📖', 'Sagas'],
@@ -32,6 +32,7 @@ export function Toolbar() {
   const mode = useUI((s) => s.mode);
   const panel = useUI((s) => s.panel);
   const theme = useUI((s) => s.theme);
+  const extras = useUI((s) => s.extras);
   const privacy = useUI((s) => s.privacy);
   const timeYear = useUI((s) => s.timeYear);
   const thread = useUI((s) => s.thread);
@@ -50,10 +51,10 @@ export function Toolbar() {
   return (
     <header className="toolbar" data-nopan ref={ref}>
       <div className="brand" title={d.motto}>
-        <Shield arms={houseArms(d, mainHouse)} size={30} />
+        {extras ? <Shield arms={houseArms(d, mainHouse)} size={30} /> : <span className="brand-mark" aria-hidden>♛</span>}
         <div>
           <div className="brand-name">{d.name}</div>
-          {d.motto && <div className="brand-motto">{d.motto}</div>}
+          {extras && d.motto && <div className="brand-motto">{d.motto}</div>}
         </div>
       </div>
       <nav className="modes" aria-label="View">
@@ -163,7 +164,7 @@ export function SearchPalette() {
             setQ(e.target.value);
             setI(0);
           }}
-          placeholder="Seek a name, epithet or calling…"
+          placeholder="Search by name or occupation…"
           onKeyDown={(e) => {
             if (e.key === 'Escape') useUI.setState({ searchOpen: false });
             if (e.key === 'ArrowDown') setI((x) => Math.min(results.length - 1, x + 1));
@@ -174,11 +175,11 @@ export function SearchPalette() {
         <ul>
           {results.map((p, k) => (
             <li key={p.id} className={k === i ? 'on' : ''} onMouseEnter={() => setI(k)} onClick={() => go(p.id)}>
-              <Shield arms={resolveArms(d, p.id).arms} shape={resolveArms(d, p.id).shape} size={22} />
+              <Face p={p} color={houseColor(d, houseOf(p))} size={26} />
               <span className="pal-name">
                 {p.title ? `${p.title} ` : ''}
                 {fullName(p)}
-                {p.epithet && <em> {p.epithet}</em>}
+                {p.occupation && <em> · {p.occupation}</em>}
               </span>
               <span className="muted">{lifespan(p)}</span>
             </li>

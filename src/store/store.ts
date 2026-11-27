@@ -179,6 +179,8 @@ interface UIState {
   theme: 'parchment' | 'candle';
   plain: boolean;
   crests: boolean;
+  /** Heraldry & dynasty extras: crests, epithets, mottos, the heraldry tab */
+  extras: boolean;
   searchOpen: boolean;
   highlightHouse?: string;
   bookOpen: boolean;
@@ -211,6 +213,7 @@ export const useUI = create<UIState>(() => ({
   theme: loadPref('theme', prefersDark ? 'candle' : 'parchment'),
   plain: loadPref('plain', false),
   crests: loadPref('crests', false),
+  extras: loadPref('extras', false),
   searchOpen: false,
   bookOpen: false,
   stamp: 0,
@@ -240,6 +243,7 @@ useUI.subscribe((s, prev) => {
   if (s.plain !== prev.plain) savePref('plain', s.plain);
   if (s.privacy !== prev.privacy) savePref('privacy', s.privacy);
   if (s.crests !== prev.crests) savePref('crests', s.crests);
+  if (s.extras !== prev.extras) savePref('extras', s.extras);
 });
 
 let toastTimer: number | undefined;

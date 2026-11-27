@@ -42,11 +42,13 @@ const TITLES: Record<PanelId, string> = {
 
 export function Panel() {
   const panel = useUI((s) => s.panel);
+  const extras = useUI((s) => s.extras);
   if (!panel) return null;
+  const title = panel === 'houses' && !extras ? 'Families' : TITLES[panel];
   return (
-    <aside className="drawer panel" data-nopan aria-label={TITLES[panel]}>
+    <aside className="drawer panel" data-nopan aria-label={title}>
       <header className="panel-head">
-        <h2>{TITLES[panel]}</h2>
+        <h2>{title}</h2>
         <button className="icon-btn" onClick={() => useUI.setState({ panel: null })} aria-label="Close panel">
           ✕
         </button>
@@ -89,6 +91,7 @@ function PersonChip({ id }: { id: string }) {
 function Houses() {
   const d = useData((s) => s.d);
   const hl = useUI((s) => s.highlightHouse);
+  const extras = useUI((s) => s.extras);
   const [editing, setEditing] = useState<string | null>(null);
   const houses = useMemo(() => {
     const m = new Map<string, Person[]>();
@@ -102,27 +105,33 @@ function Houses() {
   }, [d.people]);
   return (
     <div className="houses">
-      <p className="hint">A House is everyone born to a surname. Click a House to light it up on the tree; give it arms and a motto of its own.</p>
+      <p className="hint">
+        {extras
+          ? 'A House is everyone born to a surname. Click a House to light it up on the tree; give it arms and a motto of its own.'
+          : 'Everyone grouped by the surname they were born with. Click a family to highlight it on the tree.'}
+      </p>
       {houses.map(([name, members]) => {
         const info = d.houses[name];
         const years = members.map(birthYear).filter((y): y is number => y !== undefined);
         return (
           <div key={name} className={`house-card ${hl === name ? 'on' : ''}`} style={{ ['--house' as any]: houseColor(d, name) }}>
             <button className="house-main" onClick={() => useUI.setState({ highlightHouse: hl === name ? undefined : name })}>
-              <Shield arms={houseArms(d, name)} size={42} />
+              {extras ? <Shield arms={houseArms(d, name)} size={42} /> : <span className="family-dot" aria-hidden />}
               <div>
-                <div className="house-name">House {name}</div>
-                {info?.motto && <div className="house-motto">“{info.motto}”</div>}
+                <div className="house-name">{extras ? `House ${name}` : `${name} family`}</div>
+                {extras && info?.motto && <div className="house-motto">“{info.motto}”</div>}
                 <div className="muted small">
-                  {members.length} soul{members.length > 1 ? 's' : ''}
+                  {members.length} {members.length > 1 ? 'people' : 'person'}
                   {years.length > 0 && ` · since ${Math.min(...years)}`}
                 </div>
               </div>
             </button>
-            <button className="link" onClick={() => setEditing(editing === name ? null : name)}>
-              {editing === name ? 'Done' : 'Arms & motto'}
-            </button>
-            {editing === name && (
+            {extras && (
+              <button className="link" onClick={() => setEditing(editing === name ? null : name)}>
+                {editing === name ? 'Done' : 'Arms & motto'}
+              </button>
+            )}
+            {extras && editing === name && (
               <div className="house-edit">
                 <label className="field">
                   <span>Motto</span>
@@ -657,6 +666,7 @@ function Treasury() {
   const d = useData((s) => s.d);
   const plain = useUI((s) => s.plain);
   const crests = useUI((s) => s.crests);
+  const extras = useUI((s) => s.extras);
   const [redact, setRedact] = useState(true);
   const savedAt = useData((s) => s.savedAt);
 
@@ -698,15 +708,17 @@ function Treasury() {
   return (
     <div className="treasury">
       <section>
-        <h4>The Dynasty</h4>
+        <h4>{extras ? 'The Dynasty' : 'Your tree'}</h4>
         <label className="field">
-          <span>Name</span>
+          <span>Tree name</span>
           <input defaultValue={d.name} onBlur={(e) => e.target.value !== d.name && commit('Renamed the dynasty', (dr) => void (dr.name = e.target.value || 'Unnamed Dynasty'))} />
         </label>
-        <label className="field">
-          <span>Motto</span>
-          <input defaultValue={d.motto ?? ''} onBlur={(e) => e.target.value !== (d.motto ?? '') && commit('Chose a new motto', (dr) => void (dr.motto = e.target.value || undefined))} />
-        </label>
+        {extras && (
+          <label className="field">
+            <span>Motto</span>
+            <input defaultValue={d.motto ?? ''} onBlur={(e) => e.target.value !== (d.motto ?? '') && commit('Chose a new motto', (dr) => void (dr.motto = e.target.value || undefined))} />
+          </label>
+        )}
         <p className="muted small">
           {Object.keys(d.people).length} people · saved in this browser{savedAt ? ` at ${new Date(savedAt).toLocaleTimeString()}` : ''}. Nothing leaves your device unless you export it.
         </p>
@@ -738,8 +750,13 @@ function Treasury() {
           <input type="checkbox" checked={plain} onChange={(e) => useUI.setState({ plain: e.target.checked })} /> Clear Ledger — tone down ornament for heavy editing
         </label>
         <label className="check">
-          <input type="checkbox" checked={crests} onChange={(e) => useUI.setState({ crests: e.target.checked })} /> Show coats of arms on tiles that have no photo
+          <input type="checkbox" checked={extras} onChange={(e) => useUI.setState({ extras: e.target.checked })} /> Show heraldry &amp; dynasty extras (coats of arms, epithets, mottos)
         </label>
+        {extras && (
+          <label className="check">
+            <input type="checkbox" checked={crests} onChange={(e) => useUI.setState({ crests: e.target.checked })} /> Show coats of arms on tiles that have no photo
+          </label>
+        )}
       </section>
       <section>
         <h4>Begin anew</h4>
@@ -799,13 +816,13 @@ function Help() {
         Write dates as you know them: <code>1902</code>, <code>12 Mar 1902</code>, <code>c. 1850</code>, <code>bef. 1900</code>, <code>aft. 1870</code>, <code>1850-1855</code>. The herald understands GEDCOM forms
         too (<code>ABT 1850</code>).
       </p>
-      <h4>Evidence seals</h4>
+      <h4>How sure are you?</h4>
       <p>
-        <span className="conf-seal seal-verified">Verified</span> backed by a document · <span className="conf-seal seal-probable">Probable</span> likely ·{' '}
-        <span className="conf-seal seal-legend">Legend</span> family tradition.
+        Each fact can be marked <span className="conf-seal seal-verified">Confirmed</span> (backed by a document), <span className="conf-seal seal-probable">Probable</span> or{' '}
+        <span className="conf-seal seal-legend">Family story</span>. This is optional.
       </p>
-      <h4>Heraldry</h4>
-      <p>Every House receives procedurally generated arms that obey the rule of tincture. Sons inherit with cadency marks; daughters bear arms on a lozenge.</p>
+      <h4>Heraldry &amp; dynasty extras</h4>
+      <p>Coats of arms, epithets and mottos are hidden by default. Turn them on in the Treasury (🗝) under Appearance.</p>
       <p className="muted small">
         Unions: {Object.keys(useData.getState().d.unions).length} · People: {Object.keys(useData.getState().d.people).length} · Year {CURRENT_YEAR}
       </p>

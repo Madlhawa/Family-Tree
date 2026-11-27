@@ -187,7 +187,7 @@ function QuickAddForm() {
               Add as unknown
             </button>
             <button type="submit" className="btn primary">
-              Seal it ⏎
+              Add ⏎
             </button>
           </div>
         </form>

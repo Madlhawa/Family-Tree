@@ -2735,3 +2735,17 @@ a.chip:hover {
 .lod-far .card-far {
   font-size: 56px;
 }
+.brand-mark {
+  font-size: 1.5rem;
+  color: var(--crimson);
+  line-height: 1;
+  font-variant-emoji: text;
+}
+.family-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--house);
+  box-shadow: 0 0 0 2px var(--parch), 0 0 0 3px var(--gold-soft);
+}

@@ -48,9 +48,9 @@ export const EVENT_LABEL: Record<EventType, string> = {
 };
 
 export const SEAL: Record<Confidence, { label: string; cls: string; hint: string }> = {
-  verified: { label: 'Verified', cls: 'seal-verified', hint: 'Backed by a document' },
+  verified: { label: 'Confirmed', cls: 'seal-verified', hint: 'Backed by a document' },
   probable: { label: 'Probable', cls: 'seal-probable', hint: 'Likely, but not proven' },
-  legend: { label: 'Legend', cls: 'seal-legend', hint: 'Family tradition / oral history' },
+  legend: { label: 'Family story', cls: 'seal-legend', hint: 'Family tradition / oral history' },
 };
 
 export function Dossier() {
@@ -68,8 +68,10 @@ function goTo(id: string) {
 
 function DossierInner({ p }: { p: Person }) {
   const d = useData((s) => s.d);
-  const tab = useUI((s) => s.dossierTab);
+  const tab0 = useUI((s) => s.dossierTab);
   const privacy = useUI((s) => s.privacy);
+  const extras = useUI((s) => s.extras);
+  const tab = !extras && tab0 === 'heraldry' ? 'chronicle' : tab0;
   const st = useUI((s) => s.stamp);
   const arms = resolveArms(d, p.id);
   const hidden = privacy && isLiving(p);
@@ -101,7 +103,7 @@ function DossierInner({ p }: { p: Person }) {
               📷 {p.portrait ? 'Change' : 'Add photo'}
             </button>
           )}
-          {!hidden && (
+          {!hidden && extras && (
             <span className="dossier-crest" title={arms.explanation}>
               <Shield arms={arms.arms} shape={arms.shape} cadency={arms.cadency} size={30} />
             </span>
@@ -110,20 +112,21 @@ function DossierInner({ p }: { p: Person }) {
         <div className="dossier-id">
           {p.title && !hidden && <div className="d-title">{p.title}</div>}
           <h2>{hidden ? `Living ${p.surname}` : fullName(p)}</h2>
-          {p.epithet && !hidden && <div className="d-epithet">{p.epithet}</div>}
+          {p.epithet && !hidden && extras && <div className="d-epithet">{p.epithet}</div>}
+          {p.occupation && !hidden && <div className="d-epithet">{p.occupation}</div>}
           <div className="d-dates">{hidden ? 'Details sealed for privacy' : lifespan(p) || (isLiving(p) ? 'Living' : 'Dates unknown')}</div>
           <div className="d-house">
             <span className="wax" style={{ ['--house' as any]: houseColor(d, houseOf(p)) }}>
               {(houseOf(p)[0] ?? '?').toUpperCase()}
             </span>
-            House {houseOf(p) || 'Unknown'}
+            {extras ? `House ${houseOf(p) || 'Unknown'}` : `${houseOf(p) || 'Unknown'} family`}
             {p.placeholder && <span className="tag">Unknown slot</span>}
           </div>
         </div>
         {stampKey > 0 && <div key={stampKey} className="stamp-anim" aria-hidden />}
       </header>
       <nav className="tabs" role="tablist">
-        {TABS.map(([k, label]) => (
+        {TABS.filter(([k]) => extras || k !== 'heraldry').map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => useUI.setState({ dossierTab: k })}>
             {label}
           </button>
@@ -151,14 +154,14 @@ function DossierInner({ p }: { p: Person }) {
       </div>
       <footer className="dossier-foot">
         <button className="btn ghost" onClick={() => useUI.setState({ focusId: p.id })} title="Centre the tree on this person">
-          ♛ Seat on throne
+          ⌖ Centre tree here
         </button>
         <button className="btn ghost" onClick={() => useUI.setState({ thread: { a: p.id } })} title="Find how someone is related">
-          ✧ Golden thread
+          ✧ How are they related?
         </button>
         {d.rootId !== p.id && (
           <button className="btn ghost" onClick={() => actions.setRoot(p.id)} title="Make this the home person">
-            ⌂ Make home
+            ⌂ Set as home person
           </button>
         )}
         <button
@@ -167,7 +170,7 @@ function DossierInner({ p }: { p: Person }) {
             askConfirm(`Remove ${fullName(p)} from the tree? (Ctrl+Z undoes this.)`, 'Remove', true).then((ok) => ok && actions.deletePerson(p.id));
           }}
         >
-          Strike out
+          Delete
         </button>
       </footer>
     </aside>
@@ -316,6 +319,7 @@ function AtAGlance({ p }: { p: Person }) {
 }
 
 function ChronicleEdit({ p, onDone }: { p: Person; onDone: () => void }) {
+  const extras = useUI((s) => s.extras);
   const birth = eventOf(p, 'birth');
   const death = eventOf(p, 'death');
   const [f, setF] = useState({
@@ -412,26 +416,26 @@ function ChronicleEdit({ p, onDone }: { p: Person; onDone: () => void }) {
           <input value={f.surname} onChange={set('surname')} />
         </label>
       </div>
+      <label className="field">
+        <span>Occupation / known for</span>
+        <input value={f.occupation} onChange={set('occupation')} placeholder="e.g. Teacher, Engineer, Cricketer" />
+      </label>
       <div className="row2">
         <label className="field">
-          <span>Title</span>
-          <input value={f.title} onChange={set('title')} placeholder="Sir, Lady, Dr…" />
+          <span>Title (optional)</span>
+          <input value={f.title} onChange={set('title')} placeholder="Dr, Rev…" />
         </label>
+        <label className="field">
+          <span>Maiden / birth surname</span>
+          <input value={f.birthSurname} onChange={set('birthSurname')} placeholder="if different" />
+        </label>
+      </div>
+      {extras && (
         <label className="field">
           <span>Epithet</span>
           <input value={f.epithet} onChange={set('epithet')} placeholder="the Steadfast" />
         </label>
-      </div>
-      <div className="row2">
-        <label className="field">
-          <span>Birth surname (House)</span>
-          <input value={f.birthSurname} onChange={set('birthSurname')} placeholder="if different" />
-        </label>
-        <label className="field">
-          <span>Occupation / known for</span>
-          <input value={f.occupation} onChange={set('occupation')} />
-        </label>
-      </div>
+      )}
       <div className="row2">
         <label className="field">
           <span>Sex</span>
@@ -606,7 +610,7 @@ function EventEdit({ p, e, onDone }: { p: Person; e: LifeEvent; onDone: () => vo
         </label>
       </div>
       <div className="field">
-        <span>Evidence seal</span>
+        <span>How sure are you?</span>
         <div className="seal-pick">
           {(Object.keys(SEAL) as Confidence[]).map((c) => (
             <button type="button" key={c} className={`conf-seal ${SEAL[c].cls} ${f.confidence === c ? 'on' : ''}`} onClick={() => setF({ ...f, confidence: c })} title={SEAL[c].hint}>

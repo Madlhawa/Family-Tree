@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useData, useUI } from '../store/store';
 import { computeLayout } from '../layout/familyLayout';
-import { birthDate, deathDate, eventOf, fullName, houseArms, isLiving, lifespan, spousesOf, unionsOf } from '../model/graph';
+import { birthDate, deathDate, eventOf, fullName, houseArms, isLiving, lifespan, spousesOf, unionsOf, houseColor, houseOf } from '../model/graph';
 import { parseDate, sortKey } from '../model/dates';
 import { resolveArms } from '../model/arms';
 import { blazon } from '../model/heraldry';
 import { Shield } from './Shield';
+import { Face } from './PersonCard';
 import type { Person } from '../model/types';
 
 const ORD = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth', 'Eleventh', 'Twelfth'];
@@ -15,6 +16,7 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'
 export function Book() {
   const d = useData((s) => s.d);
   const [seal, setSeal] = useState(true);
+  const extras = useUI((s) => s.extras);
   const chapters = useMemo(() => {
     const L = computeLayout(d, { rootId: d.rootId, mode: 'family', collapsedDown: new Set(), collapsedUp: new Set() });
     const byGen = new Map<number, Person[]>();
@@ -46,10 +48,10 @@ export function Book() {
       </div>
       <article className="book">
         <section className="book-title">
-          <Shield arms={houseArms(d, mainSurname)} size={150} />
+          {extras && <Shield arms={houseArms(d, mainSurname)} size={150} />}
           <h1>{d.name}</h1>
-          {d.motto && <p className="book-motto">“{d.motto}”</p>}
-          <p className="book-blazon">{blazon(houseArms(d, mainSurname))}</p>
+          {extras && d.motto && <p className="book-motto">“{d.motto}”</p>}
+          {extras && <p className="book-blazon">{blazon(houseArms(d, mainSurname))}</p>}
           <p className="book-colophon">A chronicle of {Object.values(d.people).filter((p) => !p.placeholder).length} souls, set down on {today}.</p>
         </section>
         {chapters.map((people, gi) => (
@@ -72,12 +74,16 @@ export function Book() {
               return (
                 <div key={p.id} className="book-entry">
                   <div className="book-entry-head">
-                    <Shield arms={r.arms} shape={r.shape} cadency={r.cadency} size={40} />
+                    {extras ? (
+                      <Shield arms={r.arms} shape={r.shape} cadency={r.cadency} size={40} />
+                    ) : (
+                      <Face p={p} color={houseColor(d, houseOf(p))} size={44} />
+                    )}
                     <div>
                       <h3>
                         {p.title && `${p.title} `}
                         {fullName(p)}
-                        {p.epithet && <em> {p.epithet}</em>}
+                        {extras && p.epithet && <em> {p.epithet}</em>}
                       </h3>
                       <div className="book-life">
                         {lifespan(p)}

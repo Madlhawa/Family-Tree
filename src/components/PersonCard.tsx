@@ -23,6 +23,8 @@ interface Props {
   pickHint: boolean;
   /** Show the coat of arms instead of a silhouette when there is no photo */
   crest: boolean;
+  /** Heraldry & dynasty extras switched on */
+  extras: boolean;
 }
 
 /** A neutral silhouette tinted with the House colour, for people without a photo. */
@@ -46,7 +48,7 @@ export function Face({ p, color, size = 24 }: { p: Person; color: string; size?:
   );
 }
 
-function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, privacy, time, isRoot, pickHint, crest }: Props) {
+function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, privacy, time, isRoot, pickHint, crest, extras }: Props) {
   const living = isLiving(p);
   const hidden = privacy && living;
   const name = hidden ? `Living ${p.surname || 'Member'}` : fullName(p);
@@ -66,7 +68,7 @@ function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, priva
     .join(' ');
   const house = houseOf(p);
   // One short line: what they did or are remembered for
-  const knownFor = hidden || p.placeholder ? '' : p.occupation || p.epithet || '';
+  const knownFor = hidden || p.placeholder ? '' : p.occupation || (extras ? p.epithet : '') || '';
   return (
     <div
       className={cls}
@@ -79,7 +81,7 @@ function PersonCardImpl({ p, x, y, arms, color, selected, dim, glow, warn, priva
       <div className="card-frame">
         {p.portrait && !hidden ? (
           <img className="card-portrait" src={p.portrait} alt="" draggable={false} />
-        ) : crest ? (
+        ) : crest && extras ? (
           <Shield arms={arms.arms} shape={arms.shape} cadency={arms.cadency} size={62} className="card-shield" />
         ) : (
           <Avatar sex={p.sex} size={76} />

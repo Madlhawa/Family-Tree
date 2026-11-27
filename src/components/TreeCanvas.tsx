@@ -34,6 +34,7 @@ export function TreeCanvas() {
   const highlightHouse = useUI((s) => s.highlightHouse);
   const sagaActive = useUI((s) => !!s.saga);
   const crests = useUI((s) => s.crests);
+  const extras = useUI((s) => s.extras);
   const quickAddOpen = useUI((s) => !!s.quickAdd);
   const [hoverId, setHoverId] = useState<string>();
   const hideTimer = useRef<number>();
@@ -303,6 +304,7 @@ export function TreeCanvas() {
               isRoot={n.id === rootId}
               pickHint={picking}
               crest={crests}
+              extras={extras}
             />
           );
         })}

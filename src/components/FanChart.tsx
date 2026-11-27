@@ -3,6 +3,7 @@ import { openDossier, useData, useUI } from '../store/store';
 import { birthUnionsOf, birthYear, deathYear, fullName, houseColor, houseOf, isLiving } from '../model/graph';
 import { resolveArms } from '../model/arms';
 import { Shield } from './Shield';
+import { Face } from './PersonCard';
 import { usePanZoom } from '../ui/usePanZoom';
 import type { Dynasty } from '../model/types';
 
@@ -44,6 +45,7 @@ export function FanChart() {
   const focusId = useUI((s) => s.focusId);
   const depth = useUI((s) => s.fanDepth);
   const privacy = useUI((s) => s.privacy);
+  const extras = useUI((s) => s.extras);
   const rootId = focusId && d.people[focusId] ? focusId : d.rootId;
   const container = useRef<HTMLDivElement>(null);
   const layer = useRef<SVGGElement>(null);
@@ -152,7 +154,11 @@ export function FanChart() {
             <circle r={R0 - 4} />
             <foreignObject x={-30} y={-62} width={60} height={70}>
               <div className="fan-shield">
-                <Shield arms={rootArms.arms} shape={rootArms.shape} cadency={rootArms.cadency} size={46} />
+                {extras ? (
+                  <Shield arms={rootArms.arms} shape={rootArms.shape} cadency={rootArms.cadency} size={46} />
+                ) : (
+                  <Face p={root} color={houseColor(d, houseOf(root))} size={52} />
+                )}
               </div>
             </foreignObject>
             <text className="fan-root" textAnchor="middle" y={26} fontSize={15}>
